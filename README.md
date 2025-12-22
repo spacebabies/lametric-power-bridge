@@ -33,9 +33,62 @@ The application is designed with a pluggable architecture in mind:
 ### 1. Clone & Setup
 
 ```bash
-git clone [https://github.com/yourusername/lametric-power-bridge.git](https://github.com/yourusername/lametric-power-bridge.git)
+git clone [https://github.com/spacebabies/lametric-power-bridge.git](https://github.com/spacebabies/lametric-power-bridge.git)
 cd lametric-power-bridge
 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### 2. Configuration
+
+Create a `.env` file in the project root to store your secrets.
+
+```
+# tibber.env
+
+# Tibber Personal Access Token
+TIBBER_TOKEN=your_tibber_token_here
+
+# LaMetric Device Config
+# You can find the URL in the LaMetric Developer Portal
+LAMETRIC_URL=http://192.168.x.x:8080/api/v2/widget/update/com.lametric.diy.devwidget/your_id
+LAMETRIC_API_KEY=your_api_key_here
+```
+
+### 3. Run manually
+
+```bash
+python bridge.py
+```
+
+## Running as a Service (Systemd)
+
+To ensure the bridge runs 24/7 and restarts on failure, install it as a systemd service.
+
+1. Edit the provided `tibber-bridge.service` to match your paths and user.
+2. Copy to systemd:
+    ```bash
+    sudo cp tibber-bridge.service /etc/systemd/system/
+    ```
+3. Enable and start:
+    ```bash
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now tibber-bridge
+    ```
+4. Check logs:
+    ```bash
+    sudo journalctl -u tibber-bridge -f
+    ```
+
+## Roadmap
+
+- [x] Tibber Pulse Backend (GraphQL WSS)
+- [ ] DSMR P1 Cable Backend (Serial/USB)
+- [ ] HomeWizard Wi-Fi P1 Backend
+- [ ] Multi-frame support (e.g. Gas usage, Voltage per phase)
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. You are free to use, modify, and distribute this software, but any modifications distributed must remain open-source under the same license. Commercial closed-source use is prohibited.
