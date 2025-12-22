@@ -30,7 +30,7 @@ python-debian==0.1.49
 python-debianbts==4.0.1
 PyYAML==6.0
 reportbug==12.0.0
-requests==2.28.1
+requests==2.32.4
 requests-toolbelt==0.10.1
 rfc3986==1.5.0
 rich==13.3.1
