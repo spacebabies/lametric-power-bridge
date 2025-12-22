@@ -1,0 +1,18 @@
+[Unit]
+Description=Tibber Pulse to LaMetric Time
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=<YOUR_USERNAME>
+Group=<YOUR_USERNAME>
+WorkingDirectory=/home/<YOUR_USERNAME>/lametric-power-bridge
+
+ExecStart=/home/<YOUR_USERNAME>/lametric-power-bridge/.venv/bin/python bridge.py
+
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
