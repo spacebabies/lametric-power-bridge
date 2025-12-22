@@ -25,7 +25,7 @@ logging.basicConfig(
     format='%(levelname)s - %(message)s',
     datefmt='%H:%M:%S'
 )
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 def get_tibber_config():
     """
@@ -93,6 +93,10 @@ def send_http_payload(payload):
     Executes the HTTP Push to LaMetric Time.
     Is ran in a thread to not block the main loop.
     """
+    if not LAMETRIC_URL or not LAMETRIC_API_KEY:
+        logger.warning("LaMetric configuration missing (LAMETRIC_URL or LAMETRIC_API_KEY). Skipping push.")
+        return
+
     try:
         r = requests.post(
             LAMETRIC_URL,
@@ -151,9 +155,9 @@ async def tibber_stream(wss_url, home_id):
     logger.info(f"Tibber API: Connect WebSocket {wss_url}")
     
     async for websocket in websockets.connect(
-        wss_url, 
+        wss_url,
         subprotocols=["graphql-transport-ws"],
-        user_agent_header=USER_AGENT
+        extra_headers={"User-Agent": USER_AGENT}
     ):
         try:
             # --- STEP A: Connection Init ---
@@ -211,7 +215,7 @@ async def tibber_stream(wss_url, home_id):
                     logger.error(f"Tibber API: Stream error: {data}")
                 
                 elif msg_type == "complete":
-                    logger.info("Tibber API: Server stopped the.")
+                    logger.info("Tibber API: Server stopped the stream.")
                     break
 
         except websockets.ConnectionClosed as e:
