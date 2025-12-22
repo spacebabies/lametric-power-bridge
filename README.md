@@ -43,18 +43,11 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-Create a `.env` file in the project root to store your secrets.
+Copy the included `.env` file to store your secrets.
 
-```
-# tibber.env
-
-# Tibber Personal Access Token
-TIBBER_TOKEN=your_tibber_token_here
-
-# LaMetric Device Config
-# You can find the URL in the LaMetric Developer Portal
-LAMETRIC_URL=http://192.168.x.x:8080/api/v2/widget/update/com.lametric.diy.devwidget/your_id
-LAMETRIC_API_KEY=your_api_key_here
+```bash
+cp tibber.env.example tibber.env
+nano tibber.env
 ```
 
 ### 3. Run manually
