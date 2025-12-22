@@ -33,7 +33,7 @@ The application is designed with a pluggable architecture in mind:
 ### 1. Clone & Setup
 
 ```bash
-git clone [https://github.com/spacebabies/lametric-power-bridge.git](https://github.com/spacebabies/lametric-power-bridge.git)
+git clone https://github.com/spacebabies/lametric-power-bridge.git
 cd lametric-power-bridge
 
 python3 -m venv .venv
