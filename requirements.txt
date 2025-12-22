@@ -10,7 +10,7 @@ distro-info==1.5+deb12u1
 dnspython==2.3.0
 gpg==1.18.0
 h11==0.14.0
-h2==4.1.0
+h2==4.3.0
 hpack==4.0.0
 httpcore==0.16.3
 httplib2==0.20.4
