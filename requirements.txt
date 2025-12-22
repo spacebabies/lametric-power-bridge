@@ -37,4 +37,4 @@ rich==13.3.1
 six==1.16.0
 sniffio==1.2.0
 unattended-upgrades==0.1
-urllib3==1.26.12
+urllib3==2.6.0
