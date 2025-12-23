@@ -63,16 +63,16 @@ To ensure the bridge runs 24/7 and restarts on failure, install it as a systemd 
 1. Edit the provided `tibber-bridge.service` to match your paths and user.
 2. Copy to systemd:
     ```bash
-    sudo cp tibber-bridge.service /etc/systemd/system/
+    sudo cp lametric-power-bridge.service /etc/systemd/system/
     ```
 3. Enable and start:
     ```bash
     sudo systemctl daemon-reload
-    sudo systemctl enable --now tibber-bridge
+    sudo systemctl enable --now lametric-power-bridge
     ```
 4. Check logs:
     ```bash
-    sudo journalctl -u tibber-bridge -f
+    sudo journalctl -u lametric-power-bridge -f
     ```
 
 ## Roadmap

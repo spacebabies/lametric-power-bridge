@@ -157,7 +157,7 @@ async def tibber_stream(wss_url, home_id):
     async for websocket in websockets.connect(
         wss_url,
         subprotocols=["graphql-transport-ws"],
-        extra_headers={"User-Agent": USER_AGENT}
+        additional_headers={"User-Agent": USER_AGENT}
     ):
         try:
             # --- STEP A: Connection Init ---
