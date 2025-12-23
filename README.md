@@ -1,8 +1,10 @@
 # LaMetric Power Bridge ⚡️
 
-A robust, real-time bridge to push live energy consumption data to **LaMetric Time**.
+A robust, real-time bridge to push live power data to **LaMetric Time**.
 
-Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to energy providers (currently **Tibber**, with **P1/HomeWizard** support coming soon) and pushes live wattage updates directly to your LaMetric device via the local network.
+![Photo of a LaMetric Time with "⚡️ 3517 W" on its display](https://github.com/user-attachments/assets/38b71bdb-2986-449c-b10c-d7640edbeb6d)
+
+Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements (currently **Tibber Pulse**, with P1 Serial, and HomeWizard support coming soon) and pushes live wattage updates directly to your LaMetric device via the local network.
 
 It is built to be "fail-safe": it handles network dropouts, API reconnects, and device unavailability gracefully without crashing.
 
@@ -28,6 +30,7 @@ The application is designed with a pluggable architecture in mind:
 
 * Python 3.9+
 * A LaMetric Time device (Developer Mode enabled)
+* A "smart" or connected electricity meter, ostensibly
 * A Tibber Pulse (for the Tibber backend)
 
 ### 0. LaMetric Time Configuration
