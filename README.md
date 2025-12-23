@@ -30,6 +30,16 @@ The application is designed with a pluggable architecture in mind:
 * A LaMetric Time device (Developer Mode enabled)
 * A Tibber Pulse (for the Tibber backend)
 
+### 0. LaMetric Time Configuration
+
+1. Open the LaMetric Time mobile app and select your device.
+2. Click the `+` sign (Market)
+3. Add **My Data DIY**, published by LaMetric
+4. Give it a name and choose **HTTP Push** as the Type.
+5. Note the Push URL, this goes into `LAMETRIC_URL` configuration value.
+
+<img width="216" height="480" alt="Screenshot of My Data DIY LaMetric Time app configuration" src="https://github.com/user-attachments/assets/25f1e4f3-ad1a-48f8-a646-132e96c5a7ab" />
+
 ### 1. Clone & Setup
 
 ```bash
