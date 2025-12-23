@@ -1,52 +1,52 @@
 # LaMetric Power Bridge ⚡️
 
-A robust, real-time bridge to push live power data to **LaMetric Time**.
+A mildly adequate solution for obsessively watching your money burn in real-time.
 
 ![Photo of a LaMetric Time with "⚡️ 3517 W" on its display](https://github.com/user-attachments/assets/38b71bdb-2986-449c-b10c-d7640edbeb6d)
 
-Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements (currently **Tibber Pulse**, with P1 Serial, and HomeWizard support coming soon) and pushes live wattage updates directly to your LaMetric device via the local network.
+Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements (currently **Tibber Pulse**, with P1 Serial and HomeWizard support coming... eventually) and pushes live wattage updates directly to your LaMetric device via the local network.
 
-It is built to be "fail-safe": it handles network dropouts, API reconnects, and device unavailability gracefully without crashing.
+I built this because routing your living room's energy data through a server in Virginia just to display a number three feet away seemed a bit excessive.
 
 ## Features
 
-* **Real-time:** Updates as fast as the source allows (e.g., ~2s for Tibber Pulse).
-* **Local Push:** Uses LaMetric's Local API (no cloud delay for the display update).
-* **Visual Feedback:** Dynamically changes icons for consumption (⚡️) vs. solar return (☀️).
-* **Robust:** Auto-reconnect strategies for WebSockets and non-blocking HTTP pushes.
-* **Daemon-ready:** Includes systemd configuration for 24/7 operation.
+* **Real-time-ish:** Updates as fast as the source allows. If Tibber is lagging, we lag. We are a bridge, not a time machine.
+* **Local Push:** Uses LaMetric's Local API. We prefer our packets free-range and organic.
+* **Visual Feedback:** Displays a yellow lightning bolt (⚡️) when you are paying, and a green one (EMOJI_INEXPLICABLY_MISSING_FROM_UNICODE) when nature is paying you. Simple shapes for complex financial anxiety.
+* **Robust:** "Fail-safe." This is a technical term meaning "it crashes with dignity and restarts before you notice."
+* **Daemon-ready:** Includes systemd configuration, because running scripts in a `screen` session is for amateurs.
 
 ## Architecture
 
-The application is designed with a pluggable architecture in mind:
+The application utilizes a bespoke, highly sophisticated "pluggable architecture." In layman's terms, it is a Python script in three trench coats:
 
-1.  **Ingress (Source):** Connects to data provider (Currently: Tibber via GraphQL/WSS).
-2.  **Logic:** Normalizes data (positive/negative handling).
-3.  **Egress (Sink):** Pushes formatted frames to LaMetric.
+1.  **Ingress (Source):** Reluctantly accepts data from the provider (Currently: Tibber via GraphQL/WSS).
+2.  **Logic:** Performs complex mathematical wizardry (it checks if the number is negative).
+3.  **Egress (Sink):** Shouts the result at the LaMetric device until it complies.
 
 ## Installation
 
 ### Prerequisites
 
-* Python 3.9+
-* A LaMetric Time device (Developer Mode enabled)
-* A "smart" or connected electricity meter, ostensibly
-* A Tibber Pulse (for the Tibber backend)
+*   **Python 3.9+** (It is almost 2026; please keep up).
+*   **A LaMetric Time device** (An expensive pixel clock that has no business costing this much).
+*   **A "smart" electricity meter** (A digital spy kindly forced upon you by the grid operator to "modernize" your ability to be monitored).
+*   **A Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
 
 ### 0. LaMetric Time Configuration
 
-1. Open the LaMetric Time mobile app and select your device.
-2. Click the `+` sign (Market)
-3. Add **My Data DIY**, published by LaMetric
-4. Give it a name and choose **HTTP Push** as the Type.
-5. Note the Push URL, this goes into `LAMETRIC_URL` configuration value.
+1.  Open the LaMetric Time mobile app and select your device.
+2.  Click the `+` sign (Market).
+3.  Add **My Data DIY**, published by LaMetric.
+4.  Give it a name and choose **HTTP Push**.
+5.  Note the **Push URL**. You will need this later. Do not lose it.
 
 <img width="216" height="480" alt="Screenshot of My Data DIY LaMetric Time app configuration" src="https://github.com/user-attachments/assets/25f1e4f3-ad1a-48f8-a646-132e96c5a7ab" />
 
 ### 1. Clone & Setup
 
 ```bash
-git clone https://github.com/spacebabies/lametric-power-bridge.git
+git clone git@github.com:spacebabies/lametric-power-bridge.git
 cd lametric-power-bridge
 
 python3 -m venv .venv
@@ -56,22 +56,24 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-Copy the included `.env` file to store your secrets.
+Copy the included `.env` file. I have provided an example, which I trust is sufficient for someone of your caliber.
 
 ```bash
 cp tibber.env.example tibber.env
-nano tibber.env
+vim tibber.env  # Do not let me catch you using nano.
 ```
 
 ### 3. Run manually
+
+If you must.
 
 ```bash
 python bridge.py
 ```
 
-## Running as a Service (Systemd)
+## Running as a Service (systemd)
 
-To ensure the bridge runs 24/7 and restarts on failure, install it as a systemd service.
+To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the universe takes hold:
 
 1. Edit the provided `tibber-bridge.service` to match your paths and user.
 2. Copy to systemd:
@@ -83,7 +85,7 @@ To ensure the bridge runs 24/7 and restarts on failure, install it as a systemd 
     sudo systemctl daemon-reload
     sudo systemctl enable --now lametric-power-bridge
     ```
-4. Check logs:
+4. Check logs (to see exactly what went wrong):
     ```bash
     sudo journalctl -u lametric-power-bridge -f
     ```
@@ -91,10 +93,14 @@ To ensure the bridge runs 24/7 and restarts on failure, install it as a systemd 
 ## Roadmap
 
 - [x] Tibber Pulse Backend (GraphQL WSS)
-- [ ] DSMR P1 Cable Backend (Serial/USB)
-- [ ] HomeWizard Wi-Fi P1 Backend
-- [ ] Multi-frame support (e.g. Gas usage, Voltage per phase)
+- [ ] DSMR P1 Cable Backend (For those who prefer wires)
+- [ ] HomeWizard Wi-Fi P1 Backend (For those who trust Wi-Fi)
+- [ ] Multi-frame support (e.g., Gas usage, or perhaps the current price of tea)
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. You are free to use, modify, and distribute this software, but any modifications distributed must remain open-source under the same license. Commercial closed-source use is prohibited.
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+You are free to use, modify, and distribute this software. However, if you represent a multinational energy conglomerate or a smart-home startup looking to package this into a monthly subscription service: **Go away**.
+
+_Commercial closed-source use is prohibited, and quite frankly, against the spirit of everything decent._
