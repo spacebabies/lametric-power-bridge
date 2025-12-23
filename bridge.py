@@ -118,13 +118,20 @@ async def push_to_lametric(power):
     """
     Formats the data and sends it to a thread.
     """
+    power = round(power)
+
     # Are we importing power, or exporting it?
     if power < 0:
         icon = ICON_SOLAR
     else:
         icon = ICON_POWER
 
-    text = f"{power} W"
+    # If power is more than 10000 W, show in kW with one decimal
+    if abs(power) >= 10000:
+        power_kw = power / 1000
+        text = f"{power_kw:.1f} kW"
+    else:
+        text = f"{power} W"
 
     # Build the frame to LaMetric specifications
     payload = {
