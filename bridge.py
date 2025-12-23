@@ -88,13 +88,13 @@ def get_tibber_config():
     return wss_url, active_home_id
 
 
-def send_http_payload(payload):
+def _perform_http_request(payload):
     """
     Executes the HTTP Push to LaMetric Time.
     Is ran in a thread to not block the main loop.
     """
     if not LAMETRIC_URL or not LAMETRIC_API_KEY:
-        logger.warning("LaMetric configuration missing (LAMETRIC_URL or LAMETRIC_API_KEY). Skipping push.")
+        logger.warning("LaMetric configuration missing. Skipping push.")
         return
 
     try:
@@ -108,6 +108,11 @@ def send_http_payload(payload):
     except Exception as e:
         logger.warning(f"LaMetric: Failed HTTP POST {e}")
 
+async def send_http_payload(payload):
+    """
+    Offloads the blocking HTTP request to a thread.
+    """
+    await asyncio.to_thread(_perform_http_request, payload)
 
 async def push_to_lametric(power):
     """
@@ -133,7 +138,7 @@ async def push_to_lametric(power):
     }
 
     # Offload blocking call to a thread
-    await asyncio.to_thread(send_http_payload, payload)
+    await send_http_payload(payload)
 
 async def tibber_stream(wss_url, home_id):
     """
