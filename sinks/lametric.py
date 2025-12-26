@@ -13,6 +13,7 @@ LAMETRIC_API_KEY = os.environ.get("LAMETRIC_API_KEY")
 LAMETRIC_URL = os.environ.get("LAMETRIC_URL")
 ICON_POWER = 26337  # Drawing power
 ICON_SOLAR = 54077  # Feeding power
+ICON_STALE = 1059   # Lightning bolt with red slash (no data)
 
 
 def _perform_http_request(payload):
@@ -77,4 +78,22 @@ async def push_to_lametric(reading: PowerReading):
     }
 
     # Offload blocking call to a thread
+    await send_http_payload(payload)
+
+
+async def push_to_lametric_stale():
+    """
+    Pushes a stale data indicator to LaMetric when no data is received.
+    Shows "-- W" with a lightning bolt with red slash icon.
+    """
+    payload = {
+        "frames": [
+            {
+                "text": "-- W",
+                "icon": ICON_STALE,
+                "index": 0
+            }
+        ]
+    }
+
     await send_http_payload(payload)

@@ -1,6 +1,6 @@
 import pytest
 from sources.base import PowerReading
-from sinks.lametric import push_to_lametric
+from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 @pytest.mark.asyncio
 async def test_push_to_lametric_import_power(mocker):
@@ -106,3 +106,23 @@ async def test_push_to_lametric_export_high(mocker):
         ]
     }
     mock_send.assert_called_with(expected_payload_export)
+
+@pytest.mark.asyncio
+async def test_push_to_lametric_stale(mocker):
+    # Mock the send_http_payload function to avoid actual HTTP requests
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+
+    # Call the stale data function
+    await push_to_lametric_stale()
+
+    # Verify the payload for stale data indicator
+    expected_payload_stale = {
+        "frames": [
+            {
+                "text": "-- W",
+                "icon": 1059,
+                "index": 0
+            }
+        ]
+    }
+    mock_send.assert_called_with(expected_payload_stale)
