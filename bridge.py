@@ -7,17 +7,14 @@ import requests
 import websockets
 
 from dotenv import load_dotenv
+from sinks.lametric import push_to_lametric
 
 load_dotenv("tibber.env")
 
 # --- Configuration ---
 TIBBER_TOKEN = os.environ.get("TIBBER_TOKEN")
 TIBBER_ENDPOINT = "https://api.tibber.com/v1-beta/gql"
-LAMETRIC_API_KEY = os.environ.get("LAMETRIC_API_KEY")
-LAMETRIC_URL = os.environ.get("LAMETRIC_URL")
 USER_AGENT = "SpaceBabies-Tibber-Bridge/0.0.1"
-ICON_POWER = 26337 # Drawing power
-ICON_SOLAR = 54077 # Feeding power
 
 # Setup logging
 logging.basicConfig(
@@ -87,65 +84,6 @@ def get_tibber_config():
 
     return wss_url, active_home_id
 
-
-def _perform_http_request(payload):
-    """
-    Executes the HTTP Push to LaMetric Time.
-    Is ran in a thread to not block the main loop.
-    """
-    if not LAMETRIC_URL or not LAMETRIC_API_KEY:
-        logger.warning("LaMetric configuration missing. Skipping push.")
-        return
-
-    try:
-        r = requests.post(
-            LAMETRIC_URL,
-            json=payload,
-            auth=("dev", LAMETRIC_API_KEY),
-            timeout=2
-        )
-        r.raise_for_status()
-    except Exception as e:
-        logger.warning(f"LaMetric: Failed HTTP POST {e}")
-
-async def send_http_payload(payload):
-    """
-    Offloads the blocking HTTP request to a thread.
-    """
-    await asyncio.to_thread(_perform_http_request, payload)
-
-async def push_to_lametric(power):
-    """
-    Formats the data and sends it to a thread.
-    """
-    power = round(power)
-
-    # Are we importing power, or exporting it?
-    if power < 0:
-        icon = ICON_SOLAR
-    else:
-        icon = ICON_POWER
-
-    # If power is more than 10000 W, show in kW with one decimal
-    if abs(power) >= 10000:
-        power_kw = power / 1000
-        text = f"{power_kw:.1f} kW"
-    else:
-        text = f"{power} W"
-
-    # Build the frame to LaMetric specifications
-    payload = {
-        "frames": [
-            {
-                "text": text,
-                "icon": icon,
-                "index": 0
-            }
-        ]
-    }
-
-    # Offload blocking call to a thread
-    await send_http_payload(payload)
 
 async def tibber_stream(wss_url, home_id):
     """

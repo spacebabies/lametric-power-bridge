@@ -1,10 +1,10 @@
 import pytest
-from bridge import push_to_lametric
+from sinks.lametric import push_to_lametric
 
 @pytest.mark.asyncio
 async def test_push_to_lametric_import_power(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('bridge.send_http_payload')
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
 
     # Call the function with importing power
     await push_to_lametric(1500)
@@ -24,7 +24,7 @@ async def test_push_to_lametric_import_power(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_export_power(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('bridge.send_http_payload')
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
 
     # Call the function with exporting power
     await push_to_lametric(-500)
@@ -44,7 +44,7 @@ async def test_push_to_lametric_export_power(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_round_float(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('bridge.send_http_payload')
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
 
     # Call the function with exporting power
     await push_to_lametric(180.7)
@@ -64,7 +64,7 @@ async def test_push_to_lametric_round_float(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_kilowatts(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('bridge.send_http_payload')
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
 
     # Call the function with exporting power
     await push_to_lametric(10500)
@@ -84,7 +84,7 @@ async def test_push_to_lametric_kilowatts(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_export_high(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('bridge.send_http_payload')
+    mock_send = mocker.patch('sinks.lametric.send_http_payload')
 
     # Call the function with exporting power
     await push_to_lametric(-11000)
