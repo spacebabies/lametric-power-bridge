@@ -7,6 +7,7 @@ import requests
 import websockets
 
 from dotenv import load_dotenv
+from sources.base import PowerReading
 from sinks.lametric import push_to_lametric
 
 load_dotenv("tibber.env")
@@ -156,8 +157,9 @@ async def tibber_stream(wss_url, home_id):
 
                     # --- PUSH TO LAMETRIC TIME ---
                     if power is not None:
-                        await push_to_lametric(power)
-                    
+                        reading = PowerReading(power_watts=power, timestamp=timestamp)
+                        await push_to_lametric(reading)
+
                     # --- OUTPUT TO STDOUT ---
                     logger.info(f"Tibber API: [{timestamp}] Power: {power} W")
                 

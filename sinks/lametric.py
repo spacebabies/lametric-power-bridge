@@ -4,6 +4,8 @@ import logging
 import os
 import requests
 
+from sources.base import PowerReading
+
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -41,11 +43,14 @@ async def send_http_payload(payload):
     await asyncio.to_thread(_perform_http_request, payload)
 
 
-async def push_to_lametric(power):
+async def push_to_lametric(reading: PowerReading):
     """
     Formats the data and sends it to a thread.
+
+    Args:
+        reading: PowerReading object with power measurement
     """
-    power = round(power)
+    power = round(reading.power_watts)
 
     # Are we importing power, or exporting it?
     if power < 0:
