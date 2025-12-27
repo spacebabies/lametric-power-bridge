@@ -496,6 +496,44 @@ sudo journalctl -u lametric-power-bridge -f
 
 Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
+### Development Workflow (VERPLICHT) 🔄
+
+**Voor ELKE code wijziging, volg deze stappen:**
+
+1. **Maak een feature branch**
+   ```bash
+   git checkout -b feature/descriptive-name
+   ```
+   - Werk NOOIT direct op main
+   - Branch naam: `feature/`, `fix/`, of `refactor/` prefix
+
+2. **Maak de wijzigingen**
+   - Volg de architectuur principes (zie boven)
+   - Houd commits klein en gefocust
+
+3. **Schrijf/update tests**
+   - Nieuwe features: Voeg tests toe (minimum 1 test)
+   - Bug fixes: Voeg regression test toe
+   - Refactoring: Bestaande tests moeten blijven werken
+
+4. **Run tests VOOR commit**
+   ```bash
+   pytest tests/ -v
+   ```
+   - Alle tests MOETEN groen zijn
+   - Fix failures voor je commit
+
+5. **Vraag gebruiker om review/merge**
+   - Presenteer de wijzigingen
+   - Leg uit wat je hebt gedaan
+   - Laat gebruiker de branch mergen
+
+**Waarom deze workflow?**
+- Gebruiker houdt controle over main branch
+- Test failures worden vroeg gevangen
+- Git history blijft clean en reviewable
+- Eenvoudig om wijzigingen te reverteren indien nodig
+
 ### DO's ✅
 
 - **Commit early, commit often** (na elke stap)
@@ -514,7 +552,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 - **Geen network in tests**: pytest-socket blokkeert dit
 - **Geen breaking changes**: Backwards compatible blijven
 - **Geen sys.exit() in sources**: Alleen in bootstrap (connect())
-- **Geen auto-commit**: Gebruiker moet expliciet vragen
+- **Geen werk op main branch**: Altijd feature branch gebruiken
 
 ### Best Practices
 
@@ -549,8 +587,10 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 ## Changelog
 
+- **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
+- **2025-12-26**: Development Workflow toegevoegd aan CLAUDE.md (verplicht feature branches)
 - **2025-12-26**: Refactoring naar pluggable architecture (STAP 1-3)
-- **2025-12-26**: Tibber tests toegevoegd (8 tests total)
+- **2025-12-26**: Tibber tests toegevoegd (9 tests total: 6 lametric + 3 tibber)
 - **2025-12-26**: CLAUDE.md documentatie geschreven
 
 ---
