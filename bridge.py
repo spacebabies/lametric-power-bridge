@@ -7,9 +7,8 @@ import time
 
 from dotenv import load_dotenv
 
-# Load all possible env files (missing files are silently ignored)
-load_dotenv("tibber.env")
-load_dotenv("homewizard-p1.env")
+# Load configuration from single .env file
+load_dotenv("lametric-power-bridge.env")
 
 from sources.tibber import TibberSource
 from sources.homewizard_p1 import HomeWizardP1Source
@@ -31,14 +30,14 @@ def get_source(source_name: str):
     if source_name == "tibber":
         token = os.getenv("TIBBER_TOKEN")
         if not token:
-            logger.error("Tibber: TIBBER_TOKEN not configured in tibber.env")
+            logger.error("Tibber: TIBBER_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: Tibber")
         return TibberSource(token=token)
     elif source_name == "homewizard-p1":
         host = os.getenv("HOMEWIZARD_P1_HOST")
         if not host:
-            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in homewizard-p1.env")
+            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: HomeWizard P1 (v1 API)")
         return HomeWizardP1Source(host=host)

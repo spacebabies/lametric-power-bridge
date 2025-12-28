@@ -58,27 +58,22 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
-Choose your poison.
-
-#### 2a. Tibber Configuration
-
-Copy the included `.env` file. I have provided an example, which I trust is sufficient for someone of your caliber.
+Copy the provided `.env` example file and configure your data source(s). I have provided extensive comments within, which I trust are sufficient for someone of your caliber.
 
 ```bash
-cp tibber.env.example tibber.env
-vim tibber.env  # Do not let me catch you using nano.
+cp lametric-power-bridge.env.example lametric-power-bridge.env
+vim lametric-power-bridge.env  # Do not let me catch you using nano.
 ```
 
-#### 2b. HomeWizard P1 Configuration
+**Required for all sources:**
+- `LAMETRIC_URL`: Your LaMetric Push URL (from the My Data DIY app)
+- `LAMETRIC_API_KEY`: Your LaMetric API key
 
-For those who prefer their data without a middleman. Admirable, if slightly paranoid.
+**Source-specific configuration:**
+- **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
+- **HomeWizard P1:** Set `HOMEWIZARD_P1_HOST` (local IP address of your P1 Meter)
 
-```bash
-cp homewizard-p1.env.example homewizard-p1.env
-vim homewizard-p1.env  # The same warning about nano applies.
-```
-
-You will need the local IP address of your HomeWizard P1 Meter. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
+You will need the local IP address of your HomeWizard P1 Meter if using that source. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
 
 ### 3. Run manually
 

@@ -116,8 +116,7 @@ lametric-power-bridge/
 │   ├── test_tibber.py          # Tibber source tests (3 tests)
 │   ├── test_homewizard_p1.py   # HomeWizard P1 v1 tests (6 tests)
 │   └── test_bridge.py          # Bridge logic tests (3 tests)
-├── tibber.env                   # Tibber config
-├── homewizard-p1.env            # HomeWizard P1 v1 config
+├── lametric-power-bridge.env    # Configuration (all sources)
 ├── requirements.txt
 ├── requirements-dev.txt
 └── README.md
@@ -148,7 +147,7 @@ python bridge.py --source=p1-serial
 
 **Belangrijk**:
 - `--source` faalt HARD als configuratie mist (geen fallback)
-- Elke source heeft eigen `.env` file voor config
+- Alle sources gebruiken dezelfde `.env` file (`lametric-power-bridge.env`)
 - Default is `tibber` voor backwards compatibility
 
 ### Implementatie Richtlijnen
@@ -161,14 +160,14 @@ def get_source(source_name: str):
     if source_name == "tibber":
         token = os.getenv("TIBBER_TOKEN")
         if not token:
-            logger.error("Tibber: TIBBER_TOKEN not configured in tibber.env")
+            logger.error("Tibber: TIBBER_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: Tibber")
         return TibberSource(token=token)
     elif source_name == "homewizard-p1":
         host = os.getenv("HOMEWIZARD_P1_HOST")
         if not host:
-            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in homewizard-p1.env")
+            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: HomeWizard P1 (v1 API)")
         return HomeWizardP1Source(host=host)
@@ -181,7 +180,7 @@ def get_source(source_name: str):
 
 **Pattern voor nieuwe sources:**
 1. Add `elif source_name == "your-source"` case
-2. Load config van environment variable
+2. Load config van environment variable (uit `lametric-power-bridge.env`)
 3. Hard fail met duidelijke error als config mist
 4. Log welke source gebruikt wordt
 5. Return geïnitialiseerde source instance
@@ -211,14 +210,13 @@ def get_source(source_name: str):
    ```
 3. **Schrijf tests in `tests/test_your_source.py`**
 4. **Update `get_source()` in bridge.py** (add elif case + argparse choices)
-5. **Update `load_dotenv()` calls** in bridge.py om je `.env` file te laden
-6. **Maak `your-source.env.example` met configuratie template**
+5. **Update `lametric-power-bridge.env.example`** met nieuwe configuratie variabelen
 
 ### Bestaande Sources
 
 #### Tibber (sources/tibber.py)
 
-**Configuratie** (`tibber.env`):
+**Configuratie** (`lametric-power-bridge.env`):
 ```bash
 TIBBER_TOKEN=your_api_token_here
 ```
@@ -236,7 +234,7 @@ TIBBER_TOKEN=your_api_token_here
 
 #### HomeWizard P1 v1 API (sources/homewizard_p1.py)
 
-**Configuratie** (`homewizard-p1.env`):
+**Configuratie** (`lametric-power-bridge.env`):
 ```bash
 HOMEWIZARD_P1_HOST=192.168.2.87
 ```
@@ -264,7 +262,7 @@ HOMEWIZARD_P1_HOST=192.168.2.87
 
 #### HomeWizard P1 v2 API (sources/homewizard_ws.py) - TODO
 
-**Configuratie** (`homewizard-ws.env`):
+**Configuratie** (`lametric-power-bridge.env`):
 ```bash
 HOMEWIZARD_WS_URL=ws://192.168.1.xxx/api/v2/data
 ```
@@ -415,19 +413,22 @@ ExecStart=/path/to/.venv/bin/python /path/to/bridge.py
 
 ### Environment Variables
 
-**Locatie**: Per source een eigen `.env` file
+**Locatie**: Single `.env` file voor alle configuratie
 
-- `tibber.env`: `TIBBER_TOKEN=...`
-- `homewizard.env`: `HOMEWIZARD_URL=ws://...`
-- Geen shared `.env` (voorkomt verwarring)
+- `lametric-power-bridge.env`: Bevat alle configuratie variabelen
+- Voorbeeld bestand: `lametric-power-bridge.env.example`
 
 **Laden in bridge.py**:
 ```python
-# Load alle mogelijke configs (ontbrekende files worden genegeerd)
-load_dotenv("tibber.env")
-load_dotenv("homewizard.env")
-# Detectie functie checkt welke vars aanwezig zijn
+# Load configuration from single .env file
+load_dotenv("lametric-power-bridge.env")
 ```
+
+**Variabelen**:
+- `TIBBER_TOKEN`: Tibber API token (verplicht voor `--source=tibber`)
+- `HOMEWIZARD_P1_HOST`: HomeWizard P1 host IP (verplicht voor `--source=homewizard-p1`)
+- `LAMETRIC_URL`: LaMetric Push URL (verplicht voor alle sources)
+- `LAMETRIC_API_KEY`: LaMetric API key (verplicht voor alle sources)
 
 ---
 
@@ -472,10 +473,9 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 1. Implementeer `sources/homewizard_ws.py`
 2. WebSocket naar `/api/v2/data` (zie API docs)
 3. Maak `tests/test_homewizard_ws.py`
-4. Maak `homewizard-ws.env.example`
+4. Add nieuwe config vars aan `lametric-power-bridge.env.example`
 5. Add `"homewizard-ws"` to choices in bridge.py
 6. Add `elif source_name == "homewizard-ws"` case in `get_source()`
-7. Add `load_dotenv("homewizard-ws.env")` in bridge.py
 
 ### Prio 2: P1 Serial Source (sources/p1_serial.py)
 1. Add `pyserial` dependency
@@ -509,13 +509,13 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 **Debug**:
 ```bash
 # Check welke env vars geladen zijn
-python -c "from dotenv import load_dotenv; load_dotenv('tibber.env'); import os; print(os.getenv('TIBBER_TOKEN'))"
+python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('TIBBER_TOKEN'))"
 
 # Check serial device
 ls -la /dev/ttyUSB*
 
-# Check HomeWizard URL
-echo $HOMEWIZARD_URL
+# Check HomeWizard host
+python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('HOMEWIZARD_P1_HOST'))"
 ```
 
 ### Systemd service start niet
@@ -527,8 +527,8 @@ sudo journalctl -u lametric-power-bridge -f
 
 **Common issues**:
 - `.venv` path incorrect in service file
-- `tibber.env` niet readable door service user
-- TIBBER_TOKEN niet in environment (service moet env files laden)
+- `lametric-power-bridge.env` niet readable door service user
+- Config variabelen niet correct gezet in `lametric-power-bridge.env`
 
 ---
 
@@ -580,7 +580,6 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 - **Tests schrijven** voor nieuwe sources (minimum 3 tests)
 - **PowerSource Protocol volgen** voor nieuwe sources
 - **Mock alle I/O** in tests (pytest-socket forceert dit)
-- **Backwards compatibility** behouden (tibber.env blijft werken)
 - **Type hints gebruiken** waar relevant
 - **Logging** gebruiken voor belangrijke events
 
@@ -588,9 +587,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 - **Geen over-engineering**: Houd het simpel (KISS)
 - **Geen ABC's**: Gebruik Protocol voor interfaces
-- **Geen shared .env**: Elke source heeft eigen config file
 - **Geen network in tests**: pytest-socket blokkeert dit
-- **Geen breaking changes**: Backwards compatible blijven
 - **Geen sys.exit() in sources**: Alleen in bootstrap (connect())
 - **Geen werk op main branch**: Altijd feature branch gebruiken
 
@@ -628,6 +625,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 ## Changelog
 
+- **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
 - **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-p1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
 - **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
