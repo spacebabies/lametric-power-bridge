@@ -38,10 +38,14 @@ LaMetric Power Bridge is gebouwd met een **pluggable architecture** die duidelij
 │                      │          ┌──────────────────────┐
 │ homewizard_p1.py     │          │   tests/             │
 │ - HomeWizardP1Source │          ├──────────────────────┤
-│   (TODO)             │          │ test_lametric.py     │
+│   (v1 API - HTTP)    │          │ test_lametric.py     │
 │                      │          │ test_tibber.py       │
-│ p1_serial.py         │          │ conftest.py          │
-│ - P1SerialSource     │          └──────────────────────┘
+│ homewizard_ws.py     │          │ test_homewizard_p1.py│
+│ - HomeWizardWSSource │          │ conftest.py          │
+│   (v2 API - TODO)    │          └──────────────────────┘
+│                      │
+│ p1_serial.py         │
+│ - P1SerialSource     │
 │   (TODO)             │
 └──────────────────────┘
 ```
@@ -99,7 +103,8 @@ lametric-power-bridge/
 │   ├── __init__.py
 │   ├── base.py                 # PowerReading + PowerSource Protocol
 │   ├── tibber.py               # Tibber WebSocket implementatie
-│   ├── homewizard_p1.py        # HomeWizard P1 (TODO)
+│   ├── homewizard_p1.py        # HomeWizard P1 Meter (v1 HTTP API)
+│   ├── homewizard_ws.py        # HomeWizard P1 Meter (v2 WebSocket - TODO)
 │   └── p1_serial.py            # DSMR P1 Serial (TODO)
 ├── sinks/
 │   ├── __init__.py
@@ -107,10 +112,12 @@ lametric-power-bridge/
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py             # pytest fixtures
-│   ├── test_lametric.py        # Sink tests (5 tests)
-│   └── test_tibber.py          # Tibber source tests (3 tests)
-├── tibber.env                   # Tibber config (backwards compatible)
-├── homewizard.env               # HomeWizard config (TODO)
+│   ├── test_lametric.py        # Sink tests (6 tests)
+│   ├── test_tibber.py          # Tibber source tests (3 tests)
+│   ├── test_homewizard_p1.py   # HomeWizard P1 v1 tests (6 tests)
+│   └── test_bridge.py          # Bridge logic tests (3 tests)
+├── tibber.env                   # Tibber config
+├── homewizard-p1.env            # HomeWizard P1 v1 config
 ├── requirements.txt
 ├── requirements-dev.txt
 └── README.md
@@ -118,72 +125,66 @@ lametric-power-bridge/
 
 ---
 
-## Multi-Source Detectie
+## Multi-Source Selection
 
-### Auto-Detectie Volgorde
+### Command Line Source Selection
 
-Bridge.py detecteert automatisch de **beste beschikbare source** met deze prioriteit:
-
-1. **P1 Serial** (`/dev/ttyUSB0` aanwezig)
-2. **HomeWizard P1** (`HOMEWIZARD_URL` in config)
-3. **Tibber** (`TIBBER_TOKEN` in config)
-4. **Geen match** → Hard fail met error
-
-### Command Line Override
+Bridge.py vereist expliciete source selectie via `--source` argument:
 
 ```bash
-# Auto-detect (default)
+# Tibber (default als geen --source opgegeven)
 python bridge.py
-
-# Expliciete keuze (hard fail bij misconfiguratie)
-python bridge.py --source=serial
-python bridge.py --source=homewizard
 python bridge.py --source=tibber
+
+# HomeWizard P1 Meter (v1 HTTP Polling API)
+python bridge.py --source=homewizard-p1
+
+# HomeWizard P1 Meter (v2 WebSocket API - TODO)
+python bridge.py --source=homewizard-ws
+
+# P1 Serial (DSMR via USB - TODO)
+python bridge.py --source=p1-serial
 ```
 
-**Belangrijk**: Expliciete `--source` faalt HARD als configuratie mist. Geen fallback naar auto-detect.
+**Belangrijk**:
+- `--source` faalt HARD als configuratie mist (geen fallback)
+- Elke source heeft eigen `.env` file voor config
+- Default is `tibber` voor backwards compatibility
 
 ### Implementatie Richtlijnen
 
+De huidige `get_source()` functie in `bridge.py`:
+
 ```python
-# Voorbeeld detect_source() functie:
-async def detect_source(explicit_source: str | None = None):
-    if explicit_source:
-        # Hard fail bij misconfiguratie
-        if explicit_source == 'serial':
-            if not os.path.exists('/dev/ttyUSB0'):
-                logger.error("P1 Serial: /dev/ttyUSB0 not found")
-                sys.exit(1)
-            return P1SerialSource(device='/dev/ttyUSB0')
-        elif explicit_source == 'homewizard':
-            url = os.getenv('HOMEWIZARD_URL')
-            if not url:
-                logger.error("HomeWizard: HOMEWIZARD_URL not configured")
-                sys.exit(1)
-            return HomeWizardP1Source(url=url)
-        elif explicit_source == 'tibber':
-            token = os.getenv('TIBBER_TOKEN')
-            if not token:
-                logger.error("Tibber: TIBBER_TOKEN not configured")
-                sys.exit(1)
-            return TibberSource(token=token)
+def get_source(source_name: str):
+    """Initialize the selected power source with hard fail on misconfiguration"""
+    if source_name == "tibber":
+        token = os.getenv("TIBBER_TOKEN")
+        if not token:
+            logger.error("Tibber: TIBBER_TOKEN not configured in tibber.env")
+            sys.exit(1)
+        logger.info(f"Using source: Tibber")
+        return TibberSource(token=token)
+    elif source_name == "homewizard-p1":
+        host = os.getenv("HOMEWIZARD_P1_HOST")
+        if not host:
+            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in homewizard-p1.env")
+            sys.exit(1)
+        logger.info(f"Using source: HomeWizard P1 (v1 API)")
+        return HomeWizardP1Source(host=host)
+    # elif source_name == "homewizard-ws":  # TODO
+    # elif source_name == "p1-serial":      # TODO
     else:
-        # Auto-detect met prioriteit
-        if os.path.exists('/dev/ttyUSB0'):
-            logger.info("Auto-detected: P1 Serial")
-            return P1SerialSource(device='/dev/ttyUSB0')
-
-        if os.getenv('HOMEWIZARD_URL'):
-            logger.info("Auto-detected: HomeWizard P1")
-            return HomeWizardP1Source(url=os.getenv('HOMEWIZARD_URL'))
-
-        if os.getenv('TIBBER_TOKEN'):
-            logger.info("Auto-detected: Tibber")
-            return TibberSource(token=os.getenv('TIBBER_TOKEN'))
-
-        logger.error("No power source found!")
+        logger.error(f"Unknown source: {source_name}")
         sys.exit(1)
 ```
+
+**Pattern voor nieuwe sources:**
+1. Add `elif source_name == "your-source"` case
+2. Load config van environment variable
+3. Hard fail met duidelijke error als config mist
+4. Log welke source gebruikt wordt
+5. Return geïnitialiseerde source instance
 
 ---
 
@@ -209,8 +210,9 @@ async def detect_source(explicit_source: str | None = None):
                )
    ```
 3. **Schrijf tests in `tests/test_your_source.py`**
-4. **Update `detect_source()` in bridge.py**
-5. **Maak `your_source.env.example` met configuratie template**
+4. **Update `get_source()` in bridge.py** (add elif case + argparse choices)
+5. **Update `load_dotenv()` calls** in bridge.py om je `.env` file te laden
+6. **Maak `your-source.env.example` met configuratie template**
 
 ### Bestaande Sources
 
@@ -232,11 +234,39 @@ TIBBER_TOKEN=your_api_token_here
 - Auth: Bearer token in connection_init payload
 - Data: `liveMeasurement.power` (in Watts)
 
-#### HomeWizard P1 (sources/homewizard_p1.py) - TODO
+#### HomeWizard P1 v1 API (sources/homewizard_p1.py)
 
-**Configuratie** (`homewizard.env`):
+**Configuratie** (`homewizard-p1.env`):
 ```bash
-HOMEWIZARD_URL=ws://192.168.1.xxx/api/v2/data
+HOMEWIZARD_P1_HOST=192.168.2.87
+```
+
+**API Documentatie**: https://api-documentation.homewizard.com/docs/v1/measurement
+
+**Implementatie**:
+- `connect()`: Test connectivity met single HTTP GET, valideer `active_power_w` field
+- `stream()`: HTTP polling naar `/api/v1/data` endpoint (1s interval default)
+- Keep-alive: `httpx.AsyncClient` voor persistent connections
+- Error handling: Exponential backoff voor device busy (429/503) states
+- Data mapping: `active_power_w` → `PowerReading.power_watts`
+- Timestamp: `None` (v1 API bevat geen timestamps)
+
+**Features**:
+- Retry logic met max retries (default: 3)
+- Device busy detection (503 errors krijgen langere retry delay)
+- Graceful handling van missing fields (device initializing)
+- Configurable poll interval en timeout
+
+**Opmerkingen**:
+- Vriendelijk voor device: keep-alive voorkomt connection overhead
+- v1 API is polling only (geen push/WebSocket)
+- Alle fields zijn optioneel in API response
+
+#### HomeWizard P1 v2 API (sources/homewizard_ws.py) - TODO
+
+**Configuratie** (`homewizard-ws.env`):
+```bash
+HOMEWIZARD_WS_URL=ws://192.168.1.xxx/api/v2/data
 ```
 
 **API Documentatie**: https://api-documentation.homewizard.com/docs/v2/websocket
@@ -250,7 +280,7 @@ HOMEWIZARD_URL=ws://192.168.1.xxx/api/v2/data
 **Opmerkingen**:
 - WebSocket protocol verschilt van Tibber (geen GraphQL)
 - Check API docs voor exact message format
-- Mogelijk polling nodig (versus push updates)
+- Mogelijk dat v2 ook push updates heeft (versus polling)
 
 #### P1 Serial (sources/p1_serial.py) - TODO
 
@@ -438,17 +468,16 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 
 ## Toekomstige Werk (TODO)
 
-### Prio 1: HomeWizard P1 Source (KLAAR OM TE IMPLEMENTEREN)
-Nu CLI source selection werkt, kunnen we HomeWizard clean toevoegen:
-
-1. Implementeer `sources/homewizard_p1.py`
+### Prio 1: HomeWizard P1 v2 WebSocket API (sources/homewizard_ws.py)
+1. Implementeer `sources/homewizard_ws.py`
 2. WebSocket naar `/api/v2/data` (zie API docs)
-3. Maak `tests/test_homewizard.py`
-4. Maak `homewizard.env.example`
-5. Add `"homewizard"` to choices in bridge.py
-6. Add `elif source_name == "homewizard"` case in `get_source()`
+3. Maak `tests/test_homewizard_ws.py`
+4. Maak `homewizard-ws.env.example`
+5. Add `"homewizard-ws"` to choices in bridge.py
+6. Add `elif source_name == "homewizard-ws"` case in `get_source()`
+7. Add `load_dotenv("homewizard-ws.env")` in bridge.py
 
-### Prio 2: P1 Serial Source
+### Prio 2: P1 Serial Source (sources/p1_serial.py)
 1. Add `pyserial` dependency
 2. Implementeer `sources/p1_serial.py`
 3. DSMR telegram parsing (gebruik library of minimale parser)
@@ -585,6 +614,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 ### Dependencies
 - **websockets**: AsyncIO WebSocket library
 - **requests**: HTTP client voor bootstrap calls
+- **httpx**: Modern async HTTP client voor polling sources (keep-alive support)
 - **python-dotenv**: Environment variable loading
 - **pytest-asyncio**: AsyncIO support in pytest
 - **pytest-mock**: Mocking framework
@@ -598,6 +628,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 ## Changelog
 
+- **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-p1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
 - **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
 - **2025-12-26**: Development Workflow toegevoegd aan CLAUDE.md (verplicht feature branches)
