@@ -4,7 +4,7 @@ A mildly adequate solution for obsessively watching your money burn in real-time
 
 ![Photo of a LaMetric Time with "⚡️ 3517 W" on its display](https://github.com/user-attachments/assets/38b71bdb-2986-449c-b10c-d7640edbeb6d)
 
-Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements (currently **Tibber Pulse**, with P1 Serial and HomeWizard support coming... eventually) and pushes live wattage updates directly to your LaMetric device via the local network.
+Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements from various sources (**Tibber Pulse** via WebSocket, or **HomeWizard P1 Meter** via HTTP polling, with P1 Serial support coming when I can be bothered) and pushes live wattage updates directly to your LaMetric device via the local network.
 
 I built this because routing your living room's energy data through a server in Virginia just to display a number three feet away seemed a bit excessive.
 
@@ -20,7 +20,7 @@ I built this because routing your living room's energy data through a server in 
 
 The application utilizes a bespoke, highly sophisticated "pluggable architecture." In layman's terms, it is a Python script in three trench coats:
 
-1.  **Ingress (Source):** Reluctantly accepts data from the provider (Currently: Tibber via GraphQL/WSS).
+1.  **Ingress (Source):** Reluctantly accepts data from the provider (Tibber via GraphQL/WSS, or HomeWizard P1 via HTTP GET, because variety is the spice of unnecessary complexity).
 2.  **Logic:** Performs complex mathematical wizardry (it checks if the number is negative).
 3.  **Egress (Sink):** Shouts the result at the LaMetric device until it complies.
 
@@ -31,7 +31,9 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 *   **Python 3.9+** (It is almost 2026; please keep up).
 *   **A LaMetric Time device** (An expensive pixel clock that has no business costing this much).
 *   **A "smart" electricity meter** (A digital spy kindly forced upon you by the grid operator to "modernize" your ability to be monitored).
-*   **A Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
+*   **One of the following data sources:**
+    *   **Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
+    *   **HomeWizard P1 Meter** (A tiny box that sits between your smart meter and your Wi-Fi router, politely asking for permission to read numbers once per second. Refreshingly local, which is the entire point).
 
 ### 0. LaMetric Time Configuration
 
@@ -56,6 +58,10 @@ pip install -r requirements.txt
 
 ### 2. Configuration
 
+Choose your poison.
+
+#### 2a. Tibber Configuration
+
 Copy the included `.env` file. I have provided an example, which I trust is sufficient for someone of your caliber.
 
 ```bash
@@ -63,19 +69,37 @@ cp tibber.env.example tibber.env
 vim tibber.env  # Do not let me catch you using nano.
 ```
 
+#### 2b. HomeWizard P1 Configuration
+
+For those who prefer their data without a middleman. Admirable, if slightly paranoid.
+
+```bash
+cp homewizard-p1.env.example homewizard-p1.env
+vim homewizard-p1.env  # The same warning about nano applies.
+```
+
+You will need the local IP address of your HomeWizard P1 Meter. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
+
 ### 3. Run manually
 
 If you must.
 
 ```bash
+# Tibber (default)
 python bridge.py
+
+# HomeWizard P1 Meter
+python bridge.py --source=homewizard-p1
 ```
+
+The bridge defaults to Tibber for backwards compatibility. If you configured HomeWizard, you must explicitly specify `--source=homewizard-p1`. This is intentional. I am not your butler.
 
 ## Running as a Service (systemd)
 
 To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the universe takes hold:
 
-1. Edit the provided `tibber-bridge.service` to match your paths and user.
+1. Edit the provided `lametric-power-bridge.service` to match your paths and user.
+   - If using HomeWizard, add `--source=homewizard-p1` to the `ExecStart` line. The service file defaults to Tibber, naturally.
 2. Copy to systemd:
     ```bash
     sudo cp lametric-power-bridge.service /etc/systemd/system/
@@ -93,8 +117,9 @@ To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the u
 ## Roadmap
 
 - [x] Tibber Pulse Backend (GraphQL WSS)
-- [ ] DSMR P1 Cable Backend (For those who prefer wires)
-- [ ] HomeWizard Wi-Fi P1 Backend (For those who trust Wi-Fi)
+- [x] HomeWizard P1 Meter Backend (v1 HTTP Polling API) — _For those who trust Wi-Fi but distrust cloud services_
+- [ ] HomeWizard P1 Meter Backend (v2 WebSocket API) — _Same device, slightly fancier protocol_
+- [ ] DSMR P1 Cable Backend (For those who prefer wires and have USB ports to spare)
 - [ ] Multi-frame support (e.g., Gas usage, or perhaps the current price of tea)
 
 ## License
