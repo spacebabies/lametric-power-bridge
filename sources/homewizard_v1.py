@@ -52,6 +52,17 @@ class HomeWizardV1Source:
         self.base_url = f"http://{host}/api/v1/data"
         self.client = None
 
+    async def __aenter__(self):
+        """Context manager entry: connect to device"""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit: cleanup resources"""
+        if self.client:
+            await self.client.aclose()
+            logger.info("HomeWizard v1: Client closed")
+
     async def connect(self) -> None:
         """
         Phase 1: HTTP Bootstrap.
@@ -206,8 +217,3 @@ class HomeWizardV1Source:
                     f"Retrying in {retry_delay:.1f}s... ({consecutive_errors}/{self.max_retries})"
                 )
                 await asyncio.sleep(retry_delay)
-
-        # Cleanup on exit
-        if self.client:
-            await self.client.aclose()
-            logger.info("HomeWizard v1: Client closed")

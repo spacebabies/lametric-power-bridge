@@ -196,3 +196,25 @@ async def test_homewizard_stream_missing_active_power_field(mocker):
     # Verify we got the second reading (first was skipped)
     assert len(readings) == 1
     assert readings[0].power_watts == 999.0
+
+
+@pytest.mark.asyncio
+async def test_homewizard_context_manager(mocker):
+    """Test that HomeWizardV1Source works as async context manager"""
+    # Mock httpx.AsyncClient
+    mock_client = mocker.AsyncMock()
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"active_power_w": 1500}
+    mock_response.raise_for_status = mocker.Mock()
+    mock_client.get.return_value = mock_response
+
+    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+
+    # Use context manager pattern
+    async with HomeWizardV1Source(host="192.168.2.87") as source:
+        # Verify connection was established
+        assert source.client is not None
+        mock_client.get.assert_called_once_with("http://192.168.2.87/api/v1/data")
+
+    # Verify cleanup was called on exit
+    mock_client.aclose.assert_called_once()

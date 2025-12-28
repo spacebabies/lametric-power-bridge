@@ -86,7 +86,37 @@ class PowerSource(Protocol):
 - Type checking met mypy/pyright
 - Pythonic (geen gedwongen `class Foo(PowerSource)`)
 
-### 3. Single Responsibility
+### 3. Context Manager Pattern
+
+Alle sources implementeren async context manager voor automatic resource cleanup:
+
+```python
+async with HomeWizardV1Source(host="192.168.2.87") as source:
+    async for reading in source.stream():
+        await push_to_lametric(reading)
+# Client automatisch geclosed bij exit
+```
+
+**Voordelen**:
+- Gegarandeerde cleanup (httpx client, websockets, etc)
+- Pythonic async pattern
+- Geen handmatige `aclose()` calls nodig
+- Werkt ook met oude `await source.connect()` pattern (backwards compatible)
+
+**Implementatie**:
+```python
+class YourSource:
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup resources (close clients, etc)
+        if self.client:
+            await self.client.aclose()
+```
+
+### 4. Single Responsibility
 
 - **Sources**: Alleen data ophalen en converteren naar PowerReading
 - **Sinks**: Alleen data formatteren en versturen
