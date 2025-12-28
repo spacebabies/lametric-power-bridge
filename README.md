@@ -136,6 +136,12 @@ To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the u
 - [ ] DSMR P1 Cable Backend (For those who prefer wires and have USB ports to spare)
 - [ ] Multi-frame support (e.g., Gas usage, or perhaps the current price of tea)
 
+## Acknowledgments
+
+Built with the **[HomeWizard Energy](https://www.homewizard.com/)** local API. Special thanks to the HomeWizard team for providing a well-documented local API that respects user privacy and enables creative integrations like this one.
+
+**Developer Note**: Implementation patterns inspired by HomeWizard's excellent **[python-homewizard-energy](https://github.com/homewizard/python-homewizard-energy)** library, particularly the async context manager pattern and API versioning approach. If you're building HomeWizard integrations in Python, I highly recommend checking out their official library.
+
 ## License
 
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.
