@@ -4,10 +4,11 @@ import os
 import time
 
 from dotenv import load_dotenv
-from sources.tibber import TibberSource
-from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 load_dotenv("tibber.env")
+
+from sources.tibber import TibberSource
+from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
 logging.basicConfig(
