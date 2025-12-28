@@ -1,4 +1,4 @@
-"""HomeWizard P1 Meter v1 API ingress module - polls power data via HTTP"""
+"""HomeWizard v1 API ingress module - polls power data via HTTP"""
 import asyncio
 import logging
 import sys
@@ -14,9 +14,9 @@ from sources.base import PowerReading
 logger = logging.getLogger(__name__)
 
 
-class HomeWizardP1Source:
+class HomeWizardV1Source:
     """
-    HomeWizard P1 Meter (v1 API) power source.
+    HomeWizard v1 API power source.
 
     Polls the local HTTP API at regular intervals to retrieve
     real-time power measurements from the smart meter.
@@ -33,10 +33,10 @@ class HomeWizardP1Source:
         max_retries: int = 3
     ):
         """
-        Initialize HomeWizard P1 source.
+        Initialize HomeWizard v1 source.
 
         Args:
-            host: IP address or hostname of the P1 Meter (e.g., "192.168.2.87")
+            host: IP address or hostname of the device (e.g., "192.168.2.87")
             poll_interval: Seconds between polls (default: 1.0)
             timeout: HTTP request timeout in seconds (default: 5.0)
             max_retries: Maximum consecutive retries on errors (default: 3)
@@ -55,10 +55,10 @@ class HomeWizardP1Source:
     async def connect(self) -> None:
         """
         Phase 1: HTTP Bootstrap.
-        Validates connectivity to the P1 Meter and creates persistent client.
+        Validates connectivity to the device and creates persistent client.
         """
         if not self.host:
-            logger.error("HOMEWIZARD_P1_HOST not configured")
+            logger.error("HOMEWIZARD_HOST not configured")
             sys.exit(1)
             return  # For test mocking: prevent further execution
 
@@ -70,7 +70,7 @@ class HomeWizardP1Source:
 
         # Test connectivity with a single request
         try:
-            logger.info(f"HomeWizard P1: Testing connection to {self.base_url}")
+            logger.info(f"HomeWizard v1: Testing connection to {self.base_url}")
             response = await self.client.get(self.base_url)
             response.raise_for_status()
 
@@ -79,27 +79,27 @@ class HomeWizardP1Source:
             # Validate that we got power data
             if "active_power_w" not in data:
                 logger.warning(
-                    "HomeWizard P1: Response missing 'active_power_w' field. "
-                    "Device may not be a P1 Meter or is not receiving data from smart meter."
+                    "HomeWizard v1: Response missing 'active_power_w' field. "
+                    "Device may not be receiving data from smart meter."
                 )
             else:
                 logger.info(
-                    f"HomeWizard P1: Connection successful. "
+                    f"HomeWizard v1: Connection successful. "
                     f"Current power: {data['active_power_w']} W"
                 )
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"HomeWizard P1: HTTP error {e.response.status_code}: {e}")
+            logger.error(f"HomeWizard v1: HTTP error {e.response.status_code}: {e}")
             await self.client.aclose()
             sys.exit(1)
             return
         except httpx.ConnectError:
-            logger.error(f"HomeWizard P1: Cannot connect to {self.host}. Check IP address and network.")
+            logger.error(f"HomeWizard v1: Cannot connect to {self.host}. Check IP address and network.")
             await self.client.aclose()
             sys.exit(1)
             return
         except Exception as e:
-            logger.error(f"HomeWizard P1: Bootstrap failed: {e}")
+            logger.error(f"HomeWizard v1: Bootstrap failed: {e}")
             await self.client.aclose()
             sys.exit(1)
             return
@@ -115,13 +115,13 @@ class HomeWizardP1Source:
         and implements auto-retry for transient errors.
         """
         if self.client is None:
-            logger.error("HomeWizard P1: stream() called before connect()")
+            logger.error("HomeWizard v1: stream() called before connect()")
             return
 
         consecutive_errors = 0
         retry_delay = self.poll_interval
 
-        logger.info(f"HomeWizard P1: Starting polling (interval: {self.poll_interval}s)")
+        logger.info(f"HomeWizard v1: Starting polling (interval: {self.poll_interval}s)")
 
         while True:
             try:
@@ -132,7 +132,7 @@ class HomeWizardP1Source:
                     consecutive_errors += 1
                     retry_delay = min(self.poll_interval * (2 ** consecutive_errors), 30)
                     logger.warning(
-                        f"HomeWizard P1: Device busy (HTTP {response.status_code}). "
+                        f"HomeWizard v1: Device busy (HTTP {response.status_code}). "
                         f"Retrying in {retry_delay:.1f}s..."
                     )
                     await asyncio.sleep(retry_delay)
@@ -155,7 +155,7 @@ class HomeWizardP1Source:
                     )
                 else:
                     logger.debug(
-                        "HomeWizard P1: 'active_power_w' field not in response "
+                        "HomeWizard v1: 'active_power_w' field not in response "
                         "(device may be initializing)"
                     )
 
@@ -166,14 +166,14 @@ class HomeWizardP1Source:
                 consecutive_errors += 1
                 if consecutive_errors >= self.max_retries:
                     logger.error(
-                        f"HomeWizard P1: Max retries ({self.max_retries}) exceeded. "
+                        f"HomeWizard v1: Max retries ({self.max_retries}) exceeded. "
                         f"Last error: HTTP {e.response.status_code}"
                     )
                     break
 
                 retry_delay = min(self.poll_interval * (2 ** consecutive_errors), 30)
                 logger.warning(
-                    f"HomeWizard P1: HTTP error {e.response.status_code}. "
+                    f"HomeWizard v1: HTTP error {e.response.status_code}. "
                     f"Retrying in {retry_delay:.1f}s... ({consecutive_errors}/{self.max_retries})"
                 )
                 await asyncio.sleep(retry_delay)
@@ -182,14 +182,14 @@ class HomeWizardP1Source:
                 consecutive_errors += 1
                 if consecutive_errors >= self.max_retries:
                     logger.error(
-                        f"HomeWizard P1: Max retries ({self.max_retries}) exceeded. "
+                        f"HomeWizard v1: Max retries ({self.max_retries}) exceeded. "
                         "Cannot reach device."
                     )
                     break
 
                 retry_delay = min(self.poll_interval * (2 ** consecutive_errors), 30)
                 logger.warning(
-                    f"HomeWizard P1: Connection lost. "
+                    f"HomeWizard v1: Connection lost. "
                     f"Retrying in {retry_delay:.1f}s... ({consecutive_errors}/{self.max_retries})"
                 )
                 await asyncio.sleep(retry_delay)
@@ -197,12 +197,12 @@ class HomeWizardP1Source:
             except Exception as e:
                 consecutive_errors += 1
                 if consecutive_errors >= self.max_retries:
-                    logger.error(f"HomeWizard P1: Max retries exceeded. Last error: {e}")
+                    logger.error(f"HomeWizard v1: Max retries exceeded. Last error: {e}")
                     break
 
                 retry_delay = min(self.poll_interval * (2 ** consecutive_errors), 30)
                 logger.error(
-                    f"HomeWizard P1: Unexpected error: {e}. "
+                    f"HomeWizard v1: Unexpected error: {e}. "
                     f"Retrying in {retry_delay:.1f}s... ({consecutive_errors}/{self.max_retries})"
                 )
                 await asyncio.sleep(retry_delay)
@@ -210,4 +210,4 @@ class HomeWizardP1Source:
         # Cleanup on exit
         if self.client:
             await self.client.aclose()
-            logger.info("HomeWizard P1: Client closed")
+            logger.info("HomeWizard v1: Client closed")

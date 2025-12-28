@@ -36,12 +36,12 @@ LaMetric Power Bridge is gebouwd met een **pluggable architecture** die duidelij
 │ tibber.py            │          └──────────────────────┘
 │ - TibberSource       │
 │                      │          ┌──────────────────────┐
-│ homewizard_p1.py     │          │   tests/             │
-│ - HomeWizardP1Source │          ├──────────────────────┤
+│ homewizard_v1.py     │          │   tests/             │
+│ - HomeWizardV1Source │          ├──────────────────────┤
 │   (v1 API - HTTP)    │          │ test_lametric.py     │
 │                      │          │ test_tibber.py       │
-│ homewizard_ws.py     │          │ test_homewizard_p1.py│
-│ - HomeWizardWSSource │          │ conftest.py          │
+│ homewizard_v2.py     │          │ test_homewizard_v1.py│
+│ - HomeWizardV2Source │          │ conftest.py          │
 │   (v2 API - TODO)    │          └──────────────────────┘
 │                      │
 │ p1_serial.py         │
@@ -103,8 +103,8 @@ lametric-power-bridge/
 │   ├── __init__.py
 │   ├── base.py                 # PowerReading + PowerSource Protocol
 │   ├── tibber.py               # Tibber WebSocket implementatie
-│   ├── homewizard_p1.py        # HomeWizard P1 Meter (v1 HTTP API)
-│   ├── homewizard_ws.py        # HomeWizard P1 Meter (v2 WebSocket - TODO)
+│   ├── homewizard_v1.py        # HomeWizard P1 Meter (v1 HTTP API)
+│   ├── homewizard_v2.py        # HomeWizard P1 Meter (v2 WebSocket - TODO)
 │   └── p1_serial.py            # DSMR P1 Serial (TODO)
 ├── sinks/
 │   ├── __init__.py
@@ -114,7 +114,7 @@ lametric-power-bridge/
 │   ├── conftest.py             # pytest fixtures
 │   ├── test_lametric.py        # Sink tests (6 tests)
 │   ├── test_tibber.py          # Tibber source tests (3 tests)
-│   ├── test_homewizard_p1.py   # HomeWizard P1 v1 tests (6 tests)
+│   ├── test_homewizard_v1.py   # HomeWizard P1 v1 tests (6 tests)
 │   └── test_bridge.py          # Bridge logic tests (3 tests)
 ├── lametric-power-bridge.env    # Configuration (all sources)
 ├── requirements.txt
@@ -135,11 +135,11 @@ Bridge.py vereist expliciete source selectie via `--source` argument:
 python bridge.py
 python bridge.py --source=tibber
 
-# HomeWizard P1 Meter (v1 HTTP Polling API)
-python bridge.py --source=homewizard-p1
+# HomeWizard v1 API (HTTP Polling)
+python bridge.py --source=homewizard-v1
 
-# HomeWizard P1 Meter (v2 WebSocket API - TODO)
-python bridge.py --source=homewizard-ws
+# HomeWizard v2 API (WebSocket - TODO)
+python bridge.py --source=homewizard-v2
 
 # P1 Serial (DSMR via USB - TODO)
 python bridge.py --source=p1-serial
@@ -164,14 +164,14 @@ def get_source(source_name: str):
             sys.exit(1)
         logger.info(f"Using source: Tibber")
         return TibberSource(token=token)
-    elif source_name == "homewizard-p1":
-        host = os.getenv("HOMEWIZARD_P1_HOST")
+    elif source_name == "homewizard-v1":
+        host = os.getenv("HOMEWIZARD_HOST")
         if not host:
-            logger.error("HomeWizard P1: HOMEWIZARD_P1_HOST not configured in lametric-power-bridge.env")
+            logger.error("HomeWizard P1: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: HomeWizard P1 (v1 API)")
-        return HomeWizardP1Source(host=host)
-    # elif source_name == "homewizard-ws":  # TODO
+        return HomeWizardV1Source(host=host)
+    # elif source_name == "homewizard-v2":  # TODO
     # elif source_name == "p1-serial":      # TODO
     else:
         logger.error(f"Unknown source: {source_name}")
@@ -232,11 +232,11 @@ TIBBER_TOKEN=your_api_token_here
 - Auth: Bearer token in connection_init payload
 - Data: `liveMeasurement.power` (in Watts)
 
-#### HomeWizard P1 v1 API (sources/homewizard_p1.py)
+#### HomeWizard P1 v1 API (sources/homewizard_v1.py)
 
 **Configuratie** (`lametric-power-bridge.env`):
 ```bash
-HOMEWIZARD_P1_HOST=192.168.2.87
+HOMEWIZARD_HOST=192.168.2.87
 ```
 
 **API Documentatie**: https://api-documentation.homewizard.com/docs/v1/measurement
@@ -260,11 +260,11 @@ HOMEWIZARD_P1_HOST=192.168.2.87
 - v1 API is polling only (geen push/WebSocket)
 - Alle fields zijn optioneel in API response
 
-#### HomeWizard P1 v2 API (sources/homewizard_ws.py) - TODO
+#### HomeWizard P1 v2 API (sources/homewizard_v2.py) - TODO
 
 **Configuratie** (`lametric-power-bridge.env`):
 ```bash
-HOMEWIZARD_WS_URL=ws://192.168.1.xxx/api/v2/data
+HOMEWIZARD_HOST=192.168.1.xxx
 ```
 
 **API Documentatie**: https://api-documentation.homewizard.com/docs/v2/websocket
@@ -426,7 +426,7 @@ load_dotenv("lametric-power-bridge.env")
 
 **Variabelen**:
 - `TIBBER_TOKEN`: Tibber API token (verplicht voor `--source=tibber`)
-- `HOMEWIZARD_P1_HOST`: HomeWizard P1 host IP (verplicht voor `--source=homewizard-p1`)
+- `HOMEWIZARD_HOST`: HomeWizard P1 host IP (verplicht voor `--source=homewizard-v1`)
 - `LAMETRIC_URL`: LaMetric Push URL (verplicht voor alle sources)
 - `LAMETRIC_API_KEY`: LaMetric API key (verplicht voor alle sources)
 
@@ -469,13 +469,13 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 
 ## Toekomstige Werk (TODO)
 
-### Prio 1: HomeWizard P1 v2 WebSocket API (sources/homewizard_ws.py)
-1. Implementeer `sources/homewizard_ws.py`
+### Prio 1: HomeWizard P1 v2 WebSocket API (sources/homewizard_v2.py)
+1. Implementeer `sources/homewizard_v2.py`
 2. WebSocket naar `/api/v2/data` (zie API docs)
-3. Maak `tests/test_homewizard_ws.py`
+3. Maak `tests/test_homewizard_v2.py`
 4. Add nieuwe config vars aan `lametric-power-bridge.env.example`
-5. Add `"homewizard-ws"` to choices in bridge.py
-6. Add `elif source_name == "homewizard-ws"` case in `get_source()`
+5. Add `"homewizard-v2"` to choices in bridge.py
+6. Add `elif source_name == "homewizard-v2"` case in `get_source()`
 
 ### Prio 2: P1 Serial Source (sources/p1_serial.py)
 1. Add `pyserial` dependency
@@ -515,7 +515,7 @@ python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.en
 ls -la /dev/ttyUSB*
 
 # Check HomeWizard host
-python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('HOMEWIZARD_P1_HOST'))"
+python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('HOMEWIZARD_HOST'))"
 ```
 
 ### Systemd service start niet
@@ -626,7 +626,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 ## Changelog
 
 - **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
-- **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-p1`, HTTP polling, 18 tests total)
+- **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-v1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
 - **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
 - **2025-12-26**: Development Workflow toegevoegd aan CLAUDE.md (verplicht feature branches)
