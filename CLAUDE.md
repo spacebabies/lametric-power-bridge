@@ -579,39 +579,85 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 2. **Maak de wijzigingen**
    - Volg de architectuur principes (zie boven)
-   - Houd commits klein en gefocust
+   - **Commit early, commit often** op de feature branch
+   - Houd commits klein en gefocust (één feature/fix per commit)
 
 3. **Schrijf/update tests**
    - Nieuwe features: Voeg tests toe (minimum 1 test)
    - Bug fixes: Voeg regression test toe
    - Refactoring: Bestaande tests moeten blijven werken
 
-4. **Run tests VOOR commit**
+4. **Run tests en commit**
    ```bash
    pytest tests/ -v
+   git add -A
+   git commit -m "descriptive message"
    ```
-   - Alle tests MOETEN groen zijn
-   - Fix failures voor je commit
+   - Alle tests MOETEN groen zijn voor commit
+   - **COMMIT OP BRANCH = GEWENST** (dit is niet main!)
+   - Gebruik beschrijvende commit messages
 
 5. **Vraag gebruiker om review/merge**
    - Presenteer de wijzigingen
    - Leg uit wat je hebt gedaan
-   - Laat gebruiker de branch mergen
+   - Laat gebruiker de branch mergen naar main
 
 **Waarom deze workflow?**
-- Gebruiker houdt controle over main branch
+- **Commits op branches zijn GEWENST**: dit is hoe git werkt
+- **NOOIT commits op main**: gebruiker houdt controle over main branch
 - Test failures worden vroeg gevangen
 - Git history blijft clean en reviewable
 - Eenvoudig om wijzigingen te reverteren indien nodig
 
+**Git Policy Samenvatting**:
+- ✅ **DO**: Commit op feature branches (frequent en vaak!)
+- ❌ **DON'T**: Commit direct op main branch (never!)
+
+### Tone and Style 🎭
+
+**BELANGRIJK**: Dit project heeft een specifieke stem. Volg deze richtlijnen:
+
+**Prose (README, .env.example, documentatie voor gebruikers)**:
+- ✅ Gebruik **mild annoyance, sarcasm, en British humour**
+- ✅ Referentie tone: Bestaande README.md (perfecte balans)
+- ✅ Voorbeelden:
+  - "An expensive pixel clock that has no business costing this much"
+  - "It is almost 2026; please keep up"
+  - "Do not let me catch you using nano"
+  - "I am not your butler"
+- ❌ Geen sycophantic/overdreven enthousiast taalgebruik
+- ❌ Geen Amerikaanse corporate speak ("amazing!", "awesome!")
+
+**Code Comments**:
+- ✅ Neutraal en technisch
+- ✅ Duidelijk en informatief
+- ❌ **GEEN** sarcasme of humor in code comments
+- ❌ **GEEN** humor in docstrings
+
+**Commit Messages**:
+- ✅ Professioneel en beschrijvend
+- ❌ Geen humor (tenzij subtiel passend)
+
+**Voorbeeld contrast**:
+```python
+# ✅ Code comment (neutral, technical)
+# Create persistent HTTP client with keep-alive
+self.client = httpx.AsyncClient(...)
+
+# ✅ README prose (sarcastic, British)
+"HTTP GET requests, sent every second, like a needy houseguest
+checking if dinner is ready."
+```
+
 ### DO's ✅
 
-- **Commit early, commit often** (na elke stap)
+- **Commit early, commit often** op feature branches (na elke logische stap)
 - **Tests schrijven** voor nieuwe sources (minimum 3 tests)
 - **PowerSource Protocol volgen** voor nieuwe sources
 - **Mock alle I/O** in tests (pytest-socket forceert dit)
 - **Type hints gebruiken** waar relevant
 - **Logging** gebruiken voor belangrijke events
+- **Tone matchen**: Sarcasme in prose, neutral in code
 
 ### DON'Ts ❌
 
@@ -620,6 +666,8 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 - **Geen network in tests**: pytest-socket blokkeert dit
 - **Geen sys.exit() in sources**: Alleen in bootstrap (connect())
 - **Geen werk op main branch**: Altijd feature branch gebruiken
+- **Geen sycophantic taalgebruik**: README is droog/sarcastic, niet enthousiast
+- **Geen humor in code comments**: Alleen in user-facing prose
 
 ### Best Practices
 
