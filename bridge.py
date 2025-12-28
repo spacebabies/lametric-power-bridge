@@ -1,11 +1,15 @@
+import argparse
 import asyncio
 import logging
 import os
+import sys
 import time
 
 from dotenv import load_dotenv
 
+# Load all possible env files (missing files are silently ignored)
 load_dotenv("tibber.env")
+load_dotenv("homewizard.env")
 
 from sources.tibber import TibberSource
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
@@ -21,9 +25,22 @@ logger = logging.getLogger(__name__)
 # Stale data timeout (seconds)
 STALE_DATA_TIMEOUT = 60
 
-async def main():
-    # Initialize Tibber source
-    source = TibberSource(token=os.environ.get("TIBBER_TOKEN"))
+def get_source(source_name: str):
+    """Initialize the selected power source with hard fail on misconfiguration"""
+    if source_name == "tibber":
+        token = os.getenv("TIBBER_TOKEN")
+        if not token:
+            logger.error("Tibber: TIBBER_TOKEN not configured in tibber.env")
+            sys.exit(1)
+        logger.info(f"Using source: Tibber")
+        return TibberSource(token=token)
+    else:
+        logger.error(f"Unknown source: {source_name}")
+        sys.exit(1)
+
+async def main(source_name: str):
+    # Initialize selected source
+    source = get_source(source_name)
 
     # Connect (HTTP bootstrap)
     await source.connect()
@@ -73,7 +90,18 @@ async def main():
         tg.create_task(timeout_monitor())
 
 if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="LaMetric Power Bridge")
+    parser.add_argument(
+        "--source",
+        type=str,
+        default="tibber",
+        choices=["tibber"],
+        help="Power source to use (default: tibber)"
+    )
+    args = parser.parse_args()
+
     try:
-        asyncio.run(main())
+        asyncio.run(main(args.source))
     except KeyboardInterrupt:
         logger.info("Script stopped by user.")
