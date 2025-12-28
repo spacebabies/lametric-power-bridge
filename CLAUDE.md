@@ -422,20 +422,31 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 
 ### STAP 4: Add Tibber Tests (commit 5d1eb9c)
 - 3 high-level tests voor TibberSource
-- Total: 8 tests (5 lametric + 3 tibber)
+- Total: 9 tests (6 lametric + 3 tibber)
 
-**Resultaat**: Van 259-regel monoliet naar modulaire architectuur met duidelijke scheiding.
+### STAP 5: CLI Source Selection (commits 46fa5a5, d02d186)
+- Add `--source` CLI argument met argparse
+- Implementeer `get_source()` factory functie met config validatie
+- Multi-env loading (tibber.env + homewizard.env)
+- Hard fail met duidelijke errors bij misconfiguratie
+- 3 nieuwe tests voor bridge logica
+- Total: 12 tests (6 lametric + 3 tibber + 3 bridge)
+
+**Resultaat**: Van 259-regel monoliet naar modulaire architectuur met CLI support en volledige test coverage.
 
 ---
 
 ## Toekomstige Werk (TODO)
 
-### Prio 1: HomeWizard P1 Source
+### Prio 1: HomeWizard P1 Source (KLAAR OM TE IMPLEMENTEREN)
+Nu CLI source selection werkt, kunnen we HomeWizard clean toevoegen:
+
 1. Implementeer `sources/homewizard_p1.py`
 2. WebSocket naar `/api/v2/data` (zie API docs)
 3. Maak `tests/test_homewizard.py`
 4. Maak `homewizard.env.example`
-5. Update `detect_source()` in bridge.py
+5. Add `"homewizard"` to choices in bridge.py
+6. Add `elif source_name == "homewizard"` case in `get_source()`
 
 ### Prio 2: P1 Serial Source
 1. Add `pyserial` dependency
@@ -587,6 +598,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 ## Changelog
 
+- **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
 - **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
 - **2025-12-26**: Development Workflow toegevoegd aan CLAUDE.md (verplicht feature branches)
 - **2025-12-26**: Refactoring naar pluggable architecture (STAP 1-3)
