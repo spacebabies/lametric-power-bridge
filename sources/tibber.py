@@ -40,6 +40,15 @@ class TibberSource:
         self.wss_url = None
         self.home_id = None
 
+    async def __aenter__(self):
+        """Context manager entry: connect to Tibber API"""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit: no cleanup needed (websockets handles it)"""
+        pass
+
     async def connect(self) -> None:
         """
         Phase 1: HTTP Bootstrap.

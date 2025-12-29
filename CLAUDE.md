@@ -36,12 +36,16 @@ LaMetric Power Bridge is gebouwd met een **pluggable architecture** die duidelij
 │ tibber.py            │          └──────────────────────┘
 │ - TibberSource       │
 │                      │          ┌──────────────────────┐
-│ homewizard_p1.py     │          │   tests/             │
-│ - HomeWizardP1Source │          ├──────────────────────┤
-│   (TODO)             │          │ test_lametric.py     │
+│ homewizard_v1.py     │          │   tests/             │
+│ - HomeWizardV1Source │          ├──────────────────────┤
+│   (v1 API - HTTP)    │          │ test_lametric.py     │
 │                      │          │ test_tibber.py       │
-│ p1_serial.py         │          │ conftest.py          │
-│ - P1SerialSource     │          └──────────────────────┘
+│ homewizard_v2.py     │          │ test_homewizard_v1.py│
+│ - HomeWizardV2Source │          │ conftest.py          │
+│   (v2 API - TODO)    │          └──────────────────────┘
+│                      │
+│ p1_serial.py         │
+│ - P1SerialSource     │
 │   (TODO)             │
 └──────────────────────┘
 ```
@@ -82,7 +86,37 @@ class PowerSource(Protocol):
 - Type checking met mypy/pyright
 - Pythonic (geen gedwongen `class Foo(PowerSource)`)
 
-### 3. Single Responsibility
+### 3. Context Manager Pattern
+
+Alle sources implementeren async context manager voor automatic resource cleanup:
+
+```python
+async with HomeWizardV1Source(host="192.168.2.87") as source:
+    async for reading in source.stream():
+        await push_to_lametric(reading)
+# Client automatisch geclosed bij exit
+```
+
+**Voordelen**:
+- Gegarandeerde cleanup (httpx client, websockets, etc)
+- Pythonic async pattern
+- Geen handmatige `aclose()` calls nodig
+- Werkt ook met oude `await source.connect()` pattern (backwards compatible)
+
+**Implementatie**:
+```python
+class YourSource:
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup resources (close clients, etc)
+        if self.client:
+            await self.client.aclose()
+```
+
+### 4. Single Responsibility
 
 - **Sources**: Alleen data ophalen en converteren naar PowerReading
 - **Sinks**: Alleen data formatteren en versturen
@@ -99,7 +133,8 @@ lametric-power-bridge/
 │   ├── __init__.py
 │   ├── base.py                 # PowerReading + PowerSource Protocol
 │   ├── tibber.py               # Tibber WebSocket implementatie
-│   ├── homewizard_p1.py        # HomeWizard P1 (TODO)
+│   ├── homewizard_v1.py        # HomeWizard P1 Meter (v1 HTTP API)
+│   ├── homewizard_v2.py        # HomeWizard P1 Meter (v2 WebSocket - TODO)
 │   └── p1_serial.py            # DSMR P1 Serial (TODO)
 ├── sinks/
 │   ├── __init__.py
@@ -107,10 +142,11 @@ lametric-power-bridge/
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py             # pytest fixtures
-│   ├── test_lametric.py        # Sink tests (5 tests)
-│   └── test_tibber.py          # Tibber source tests (3 tests)
-├── tibber.env                   # Tibber config (backwards compatible)
-├── homewizard.env               # HomeWizard config (TODO)
+│   ├── test_lametric.py        # Sink tests (6 tests)
+│   ├── test_tibber.py          # Tibber source tests (3 tests)
+│   ├── test_homewizard_v1.py   # HomeWizard P1 v1 tests (6 tests)
+│   └── test_bridge.py          # Bridge logic tests (3 tests)
+├── lametric-power-bridge.env    # Configuration (all sources)
 ├── requirements.txt
 ├── requirements-dev.txt
 └── README.md
@@ -118,72 +154,66 @@ lametric-power-bridge/
 
 ---
 
-## Multi-Source Detectie
+## Multi-Source Selection
 
-### Auto-Detectie Volgorde
+### Command Line Source Selection
 
-Bridge.py detecteert automatisch de **beste beschikbare source** met deze prioriteit:
-
-1. **P1 Serial** (`/dev/ttyUSB0` aanwezig)
-2. **HomeWizard P1** (`HOMEWIZARD_URL` in config)
-3. **Tibber** (`TIBBER_TOKEN` in config)
-4. **Geen match** → Hard fail met error
-
-### Command Line Override
+Bridge.py vereist expliciete source selectie via `--source` argument:
 
 ```bash
-# Auto-detect (default)
+# Tibber (default als geen --source opgegeven)
 python bridge.py
-
-# Expliciete keuze (hard fail bij misconfiguratie)
-python bridge.py --source=serial
-python bridge.py --source=homewizard
 python bridge.py --source=tibber
+
+# HomeWizard v1 API (HTTP Polling)
+python bridge.py --source=homewizard-v1
+
+# HomeWizard v2 API (WebSocket - TODO)
+python bridge.py --source=homewizard-v2
+
+# P1 Serial (DSMR via USB - TODO)
+python bridge.py --source=p1-serial
 ```
 
-**Belangrijk**: Expliciete `--source` faalt HARD als configuratie mist. Geen fallback naar auto-detect.
+**Belangrijk**:
+- `--source` faalt HARD als configuratie mist (geen fallback)
+- Alle sources gebruiken dezelfde `.env` file (`lametric-power-bridge.env`)
+- Default is `tibber` voor backwards compatibility
 
 ### Implementatie Richtlijnen
 
+De huidige `get_source()` functie in `bridge.py`:
+
 ```python
-# Voorbeeld detect_source() functie:
-async def detect_source(explicit_source: str | None = None):
-    if explicit_source:
-        # Hard fail bij misconfiguratie
-        if explicit_source == 'serial':
-            if not os.path.exists('/dev/ttyUSB0'):
-                logger.error("P1 Serial: /dev/ttyUSB0 not found")
-                sys.exit(1)
-            return P1SerialSource(device='/dev/ttyUSB0')
-        elif explicit_source == 'homewizard':
-            url = os.getenv('HOMEWIZARD_URL')
-            if not url:
-                logger.error("HomeWizard: HOMEWIZARD_URL not configured")
-                sys.exit(1)
-            return HomeWizardP1Source(url=url)
-        elif explicit_source == 'tibber':
-            token = os.getenv('TIBBER_TOKEN')
-            if not token:
-                logger.error("Tibber: TIBBER_TOKEN not configured")
-                sys.exit(1)
-            return TibberSource(token=token)
+def get_source(source_name: str):
+    """Initialize the selected power source with hard fail on misconfiguration"""
+    if source_name == "tibber":
+        token = os.getenv("TIBBER_TOKEN")
+        if not token:
+            logger.error("Tibber: TIBBER_TOKEN not configured in lametric-power-bridge.env")
+            sys.exit(1)
+        logger.info(f"Using source: Tibber")
+        return TibberSource(token=token)
+    elif source_name == "homewizard-v1":
+        host = os.getenv("HOMEWIZARD_HOST")
+        if not host:
+            logger.error("HomeWizard P1: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
+            sys.exit(1)
+        logger.info(f"Using source: HomeWizard P1 (v1 API)")
+        return HomeWizardV1Source(host=host)
+    # elif source_name == "homewizard-v2":  # TODO
+    # elif source_name == "p1-serial":      # TODO
     else:
-        # Auto-detect met prioriteit
-        if os.path.exists('/dev/ttyUSB0'):
-            logger.info("Auto-detected: P1 Serial")
-            return P1SerialSource(device='/dev/ttyUSB0')
-
-        if os.getenv('HOMEWIZARD_URL'):
-            logger.info("Auto-detected: HomeWizard P1")
-            return HomeWizardP1Source(url=os.getenv('HOMEWIZARD_URL'))
-
-        if os.getenv('TIBBER_TOKEN'):
-            logger.info("Auto-detected: Tibber")
-            return TibberSource(token=os.getenv('TIBBER_TOKEN'))
-
-        logger.error("No power source found!")
+        logger.error(f"Unknown source: {source_name}")
         sys.exit(1)
 ```
+
+**Pattern voor nieuwe sources:**
+1. Add `elif source_name == "your-source"` case
+2. Load config van environment variable (uit `lametric-power-bridge.env`)
+3. Hard fail met duidelijke error als config mist
+4. Log welke source gebruikt wordt
+5. Return geïnitialiseerde source instance
 
 ---
 
@@ -209,14 +239,14 @@ async def detect_source(explicit_source: str | None = None):
                )
    ```
 3. **Schrijf tests in `tests/test_your_source.py`**
-4. **Update `detect_source()` in bridge.py**
-5. **Maak `your_source.env.example` met configuratie template**
+4. **Update `get_source()` in bridge.py** (add elif case + argparse choices)
+5. **Update `lametric-power-bridge.env.example`** met nieuwe configuratie variabelen
 
 ### Bestaande Sources
 
 #### Tibber (sources/tibber.py)
 
-**Configuratie** (`tibber.env`):
+**Configuratie** (`lametric-power-bridge.env`):
 ```bash
 TIBBER_TOKEN=your_api_token_here
 ```
@@ -232,11 +262,39 @@ TIBBER_TOKEN=your_api_token_here
 - Auth: Bearer token in connection_init payload
 - Data: `liveMeasurement.power` (in Watts)
 
-#### HomeWizard P1 (sources/homewizard_p1.py) - TODO
+#### HomeWizard P1 v1 API (sources/homewizard_v1.py)
 
-**Configuratie** (`homewizard.env`):
+**Configuratie** (`lametric-power-bridge.env`):
 ```bash
-HOMEWIZARD_URL=ws://192.168.1.xxx/api/v2/data
+HOMEWIZARD_HOST=192.168.2.87
+```
+
+**API Documentatie**: https://api-documentation.homewizard.com/docs/v1/measurement
+
+**Implementatie**:
+- `connect()`: Test connectivity met single HTTP GET, valideer `active_power_w` field
+- `stream()`: HTTP polling naar `/api/v1/data` endpoint (1s interval default)
+- Keep-alive: `httpx.AsyncClient` voor persistent connections
+- Error handling: Exponential backoff voor device busy (429/503) states
+- Data mapping: `active_power_w` → `PowerReading.power_watts`
+- Timestamp: `None` (v1 API bevat geen timestamps)
+
+**Features**:
+- Retry logic met max retries (default: 3)
+- Device busy detection (503 errors krijgen langere retry delay)
+- Graceful handling van missing fields (device initializing)
+- Configurable poll interval en timeout
+
+**Opmerkingen**:
+- Vriendelijk voor device: keep-alive voorkomt connection overhead
+- v1 API is polling only (geen push/WebSocket)
+- Alle fields zijn optioneel in API response
+
+#### HomeWizard P1 v2 API (sources/homewizard_v2.py) - TODO
+
+**Configuratie** (`lametric-power-bridge.env`):
+```bash
+HOMEWIZARD_HOST=192.168.1.xxx
 ```
 
 **API Documentatie**: https://api-documentation.homewizard.com/docs/v2/websocket
@@ -250,7 +308,7 @@ HOMEWIZARD_URL=ws://192.168.1.xxx/api/v2/data
 **Opmerkingen**:
 - WebSocket protocol verschilt van Tibber (geen GraphQL)
 - Check API docs voor exact message format
-- Mogelijk polling nodig (versus push updates)
+- Mogelijk dat v2 ook push updates heeft (versus polling)
 
 #### P1 Serial (sources/p1_serial.py) - TODO
 
@@ -385,19 +443,22 @@ ExecStart=/path/to/.venv/bin/python /path/to/bridge.py
 
 ### Environment Variables
 
-**Locatie**: Per source een eigen `.env` file
+**Locatie**: Single `.env` file voor alle configuratie
 
-- `tibber.env`: `TIBBER_TOKEN=...`
-- `homewizard.env`: `HOMEWIZARD_URL=ws://...`
-- Geen shared `.env` (voorkomt verwarring)
+- `lametric-power-bridge.env`: Bevat alle configuratie variabelen
+- Voorbeeld bestand: `lametric-power-bridge.env.example`
 
 **Laden in bridge.py**:
 ```python
-# Load alle mogelijke configs (ontbrekende files worden genegeerd)
-load_dotenv("tibber.env")
-load_dotenv("homewizard.env")
-# Detectie functie checkt welke vars aanwezig zijn
+# Load configuration from single .env file
+load_dotenv("lametric-power-bridge.env")
 ```
+
+**Variabelen**:
+- `TIBBER_TOKEN`: Tibber API token (verplicht voor `--source=tibber`)
+- `HOMEWIZARD_HOST`: HomeWizard P1 host IP (verplicht voor `--source=homewizard-v1`)
+- `LAMETRIC_URL`: LaMetric Push URL (verplicht voor alle sources)
+- `LAMETRIC_API_KEY`: LaMetric API key (verplicht voor alle sources)
 
 ---
 
@@ -438,17 +499,15 @@ Deze architectuur is het resultaat van een stapsgewijze refactoring:
 
 ## Toekomstige Werk (TODO)
 
-### Prio 1: HomeWizard P1 Source (KLAAR OM TE IMPLEMENTEREN)
-Nu CLI source selection werkt, kunnen we HomeWizard clean toevoegen:
-
-1. Implementeer `sources/homewizard_p1.py`
+### Prio 1: HomeWizard P1 v2 WebSocket API (sources/homewizard_v2.py)
+1. Implementeer `sources/homewizard_v2.py`
 2. WebSocket naar `/api/v2/data` (zie API docs)
-3. Maak `tests/test_homewizard.py`
-4. Maak `homewizard.env.example`
-5. Add `"homewizard"` to choices in bridge.py
-6. Add `elif source_name == "homewizard"` case in `get_source()`
+3. Maak `tests/test_homewizard_v2.py`
+4. Add nieuwe config vars aan `lametric-power-bridge.env.example`
+5. Add `"homewizard-v2"` to choices in bridge.py
+6. Add `elif source_name == "homewizard-v2"` case in `get_source()`
 
-### Prio 2: P1 Serial Source
+### Prio 2: P1 Serial Source (sources/p1_serial.py)
 1. Add `pyserial` dependency
 2. Implementeer `sources/p1_serial.py`
 3. DSMR telegram parsing (gebruik library of minimale parser)
@@ -480,13 +539,13 @@ Nu CLI source selection werkt, kunnen we HomeWizard clean toevoegen:
 **Debug**:
 ```bash
 # Check welke env vars geladen zijn
-python -c "from dotenv import load_dotenv; load_dotenv('tibber.env'); import os; print(os.getenv('TIBBER_TOKEN'))"
+python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('TIBBER_TOKEN'))"
 
 # Check serial device
 ls -la /dev/ttyUSB*
 
-# Check HomeWizard URL
-echo $HOMEWIZARD_URL
+# Check HomeWizard host
+python -c "from dotenv import load_dotenv; load_dotenv('lametric-power-bridge.env'); import os; print(os.getenv('HOMEWIZARD_HOST'))"
 ```
 
 ### Systemd service start niet
@@ -498,8 +557,8 @@ sudo journalctl -u lametric-power-bridge -f
 
 **Common issues**:
 - `.venv` path incorrect in service file
-- `tibber.env` niet readable door service user
-- TIBBER_TOKEN niet in environment (service moet env files laden)
+- `lametric-power-bridge.env` niet readable door service user
+- Config variabelen niet correct gezet in `lametric-power-bridge.env`
 
 ---
 
@@ -520,50 +579,95 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 2. **Maak de wijzigingen**
    - Volg de architectuur principes (zie boven)
-   - Houd commits klein en gefocust
+   - **Commit early, commit often** op de feature branch
+   - Houd commits klein en gefocust (één feature/fix per commit)
 
 3. **Schrijf/update tests**
    - Nieuwe features: Voeg tests toe (minimum 1 test)
    - Bug fixes: Voeg regression test toe
    - Refactoring: Bestaande tests moeten blijven werken
 
-4. **Run tests VOOR commit**
+4. **Run tests en commit**
    ```bash
    pytest tests/ -v
+   git add -A
+   git commit -m "descriptive message"
    ```
-   - Alle tests MOETEN groen zijn
-   - Fix failures voor je commit
+   - Alle tests MOETEN groen zijn voor commit
+   - **COMMIT OP BRANCH = GEWENST** (dit is niet main!)
+   - Gebruik beschrijvende commit messages
 
 5. **Vraag gebruiker om review/merge**
    - Presenteer de wijzigingen
    - Leg uit wat je hebt gedaan
-   - Laat gebruiker de branch mergen
+   - Laat gebruiker de branch mergen naar main
 
 **Waarom deze workflow?**
-- Gebruiker houdt controle over main branch
+- **Commits op branches zijn GEWENST**: dit is hoe git werkt
+- **NOOIT commits op main**: gebruiker houdt controle over main branch
 - Test failures worden vroeg gevangen
 - Git history blijft clean en reviewable
 - Eenvoudig om wijzigingen te reverteren indien nodig
 
+**Git Policy Samenvatting**:
+- ✅ **DO**: Commit op feature branches (frequent en vaak!)
+- ❌ **DON'T**: Commit direct op main branch (never!)
+
+### Tone and Style 🎭
+
+**BELANGRIJK**: Dit project heeft een specifieke stem. Volg deze richtlijnen:
+
+**Prose (README, .env.example, documentatie voor gebruikers)**:
+- ✅ Gebruik **mild annoyance, sarcasm, en British humour**
+- ✅ Referentie tone: Bestaande README.md (perfecte balans)
+- ✅ Voorbeelden:
+  - "An expensive pixel clock that has no business costing this much"
+  - "It is almost 2026; please keep up"
+  - "Do not let me catch you using nano"
+  - "I am not your butler"
+- ❌ Geen sycophantic/overdreven enthousiast taalgebruik
+- ❌ Geen Amerikaanse corporate speak ("amazing!", "awesome!")
+
+**Code Comments**:
+- ✅ Neutraal en technisch
+- ✅ Duidelijk en informatief
+- ❌ **GEEN** sarcasme of humor in code comments
+- ❌ **GEEN** humor in docstrings
+
+**Commit Messages**:
+- ✅ Professioneel en beschrijvend
+- ❌ Geen humor (tenzij subtiel passend)
+
+**Voorbeeld contrast**:
+```python
+# ✅ Code comment (neutral, technical)
+# Create persistent HTTP client with keep-alive
+self.client = httpx.AsyncClient(...)
+
+# ✅ README prose (sarcastic, British)
+"HTTP GET requests, sent every second, like a needy houseguest
+checking if dinner is ready."
+```
+
 ### DO's ✅
 
-- **Commit early, commit often** (na elke stap)
+- **Commit early, commit often** op feature branches (na elke logische stap)
 - **Tests schrijven** voor nieuwe sources (minimum 3 tests)
 - **PowerSource Protocol volgen** voor nieuwe sources
 - **Mock alle I/O** in tests (pytest-socket forceert dit)
-- **Backwards compatibility** behouden (tibber.env blijft werken)
 - **Type hints gebruiken** waar relevant
 - **Logging** gebruiken voor belangrijke events
+- **Tone matchen**: Sarcasme in prose, neutral in code
 
 ### DON'Ts ❌
 
 - **Geen over-engineering**: Houd het simpel (KISS)
 - **Geen ABC's**: Gebruik Protocol voor interfaces
-- **Geen shared .env**: Elke source heeft eigen config file
 - **Geen network in tests**: pytest-socket blokkeert dit
-- **Geen breaking changes**: Backwards compatible blijven
 - **Geen sys.exit() in sources**: Alleen in bootstrap (connect())
 - **Geen werk op main branch**: Altijd feature branch gebruiken
+- **Geen sycophantic taalgebruik**: README is droog/sarcastic, niet enthousiast
+- **Geen humor in code comments**: Alleen in user-facing prose
 
 ### Best Practices
 
@@ -585,6 +689,7 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 ### Dependencies
 - **websockets**: AsyncIO WebSocket library
 - **requests**: HTTP client voor bootstrap calls
+- **httpx**: Modern async HTTP client voor polling sources (keep-alive support)
 - **python-dotenv**: Environment variable loading
 - **pytest-asyncio**: AsyncIO support in pytest
 - **pytest-mock**: Mocking framework
@@ -598,6 +703,8 @@ Als je een AI agent bent (Claude Code) die aan dit project werkt:
 
 ## Changelog
 
+- **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
+- **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-v1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
 - **2025-12-26**: Stale data timeout monitoring toegevoegd (60s timeout, "-- W" indicator)
 - **2025-12-26**: Development Workflow toegevoegd aan CLAUDE.md (verplicht feature branches)

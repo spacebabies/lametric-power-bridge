@@ -7,11 +7,11 @@ import time
 
 from dotenv import load_dotenv
 
-# Load all possible env files (missing files are silently ignored)
-load_dotenv("tibber.env")
-load_dotenv("homewizard.env")
+# Load configuration from single .env file
+load_dotenv("lametric-power-bridge.env")
 
 from sources.tibber import TibberSource
+from sources.homewizard_v1 import HomeWizardV1Source
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
@@ -30,10 +30,17 @@ def get_source(source_name: str):
     if source_name == "tibber":
         token = os.getenv("TIBBER_TOKEN")
         if not token:
-            logger.error("Tibber: TIBBER_TOKEN not configured in tibber.env")
+            logger.error("Tibber: TIBBER_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
         logger.info(f"Using source: Tibber")
         return TibberSource(token=token)
+    elif source_name == "homewizard-v1":
+        host = os.getenv("HOMEWIZARD_HOST")
+        if not host:
+            logger.error("HomeWizard v1: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
+            sys.exit(1)
+        logger.info(f"Using source: HomeWizard v1 API (HTTP polling)")
+        return HomeWizardV1Source(host=host)
     else:
         logger.error(f"Unknown source: {source_name}")
         sys.exit(1)
@@ -42,52 +49,51 @@ async def main(source_name: str):
     # Initialize selected source
     source = get_source(source_name)
 
-    # Connect (HTTP bootstrap)
-    await source.connect()
+    # Use context manager for automatic resource cleanup
+    async with source:
+        # Shared state for timeout monitoring
+        state = {
+            "last_reading_time": time.time(),
+            "stale_alert_sent": False
+        }
 
-    # Shared state for timeout monitoring
-    state = {
-        "last_reading_time": time.time(),
-        "stale_alert_sent": False
-    }
+        async def timeout_monitor():
+            """Monitor that checks if data has gone stale"""
+            while True:
+                await asyncio.sleep(10)  # Check every 10 seconds
 
-    async def timeout_monitor():
-        """Monitor that checks if data has gone stale"""
-        while True:
-            await asyncio.sleep(10)  # Check every 10 seconds
+                time_since_last_reading = time.time() - state["last_reading_time"]
 
-            time_since_last_reading = time.time() - state["last_reading_time"]
+                if time_since_last_reading > STALE_DATA_TIMEOUT:
+                    if not state["stale_alert_sent"]:
+                        logger.warning(f"No data received for {STALE_DATA_TIMEOUT}s, pushing stale indicator")
+                        await push_to_lametric_stale()
+                        state["stale_alert_sent"] = True
+                else:
+                    # Reset stale flag when data is fresh
+                    state["stale_alert_sent"] = False
 
-            if time_since_last_reading > STALE_DATA_TIMEOUT:
-                if not state["stale_alert_sent"]:
-                    logger.warning(f"No data received for {STALE_DATA_TIMEOUT}s, pushing stale indicator")
-                    await push_to_lametric_stale()
-                    state["stale_alert_sent"] = True
-            else:
-                # Reset stale flag when data is fresh
-                state["stale_alert_sent"] = False
+        async def stream_readings():
+            """Stream power readings with auto-reconnect"""
+            while True:
+                try:
+                    async for reading in source.stream():
+                        # Update timestamp
+                        state["last_reading_time"] = time.time()
 
-    async def stream_readings():
-        """Stream power readings with auto-reconnect"""
-        while True:
-            try:
-                async for reading in source.stream():
-                    # Update timestamp
-                    state["last_reading_time"] = time.time()
+                        # Push to LaMetric
+                        await push_to_lametric(reading)
 
-                    # Push to LaMetric
-                    await push_to_lametric(reading)
+                        # Log to stdout
+                        logger.info(f"[{reading.timestamp}] Power: {reading.power_watts} W")
+                except Exception as e:
+                    logger.error(f"Stream error: {e}")
+                    await asyncio.sleep(5)
 
-                    # Log to stdout
-                    logger.info(f"[{reading.timestamp}] Power: {reading.power_watts} W")
-            except Exception as e:
-                logger.error(f"Stream error: {e}")
-                await asyncio.sleep(5)
-
-    # Run stream and timeout monitor in parallel
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(stream_readings())
-        tg.create_task(timeout_monitor())
+        # Run stream and timeout monitor in parallel
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(stream_readings())
+            tg.create_task(timeout_monitor())
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -96,7 +102,7 @@ if __name__ == "__main__":
         "--source",
         type=str,
         default="tibber",
-        choices=["tibber"],
+        choices=["tibber", "homewizard-v1"],
         help="Power source to use (default: tibber)"
     )
     args = parser.parse_args()
