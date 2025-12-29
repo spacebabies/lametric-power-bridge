@@ -4,7 +4,7 @@ A mildly adequate solution for obsessively watching your money burn in real-time
 
 ![Photo of a LaMetric Time with "⚡️ 3517 W" on its display](https://github.com/user-attachments/assets/38b71bdb-2986-449c-b10c-d7640edbeb6d)
 
-Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements from various sources (Tibber Pulse via WebSocket, or [HomeWizard P1 Meter](https://www.homewizard.com/p1-meter/) via HTTP/WebSocket, with P1 Serial support coming when I can be bothered) and pushes live wattage updates directly to your LaMetric device via the local network.
+Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements from various sources (Tibber Pulse via WebSocket, or [HomeWizard P1 Meter](https://www.homewizard.com/p1-meter/) via HTTP/WebSocket, or P1 Serial cable for maximum hax0r creds) and pushes live wattage updates directly to your LaMetric device via the local network.
 
 I built this because routing your living room's energy data through a server in Virginia just to display a number three feet away seemed a bit excessive.
 
@@ -34,6 +34,7 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 *   **One of the following data sources:**
     *   **Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
     *   **HomeWizard P1 Meter** (A tiny box that sits between your smart meter and your Wi-Fi router, politely asking for permission to read numbers once per second. Refreshingly local, which is the entire point).
+    *   **P1 Serial Cable** (A USB-to-RJ11 adapter that plugs directly into your smart meter's P1 port. No cloud, no Wi-Fi, just pure unfiltered DSMR telegrams over a serial connection. The most dignified option, assuming you can locate a free USB port on your server and possess the necessary permissions to access `/dev/ttyUSB0` without incident).
 
 ### 0. LaMetric Time Configuration
 
@@ -77,6 +78,7 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 - **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
 - **HomeWizard v1:** Set `HOMEWIZARD_HOST` (local IP address of your device)
 - **HomeWizard v2:** Set `HOMEWIZARD_HOST` and `HOMEWIZARD_TOKEN` (requires firmware >= 6.0 and manual token creation)
+- **P1 Serial:** Optionally set `P1_SERIAL_DEVICE` (defaults to `/dev/ttyUSB0`) and `P1_SERIAL_BAUDRATE` (defaults to `115200` for DSMR v4+, use `9600` if your meter predates the invention of high-speed serial communication)
 
 You will need the local IP address of your HomeWizard device if using that source. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
 
@@ -96,9 +98,12 @@ python bridge.py --source=homewizard-v1
 
 # HomeWizard v2 API (WebSocket)
 python bridge.py --source=homewizard-v2
+
+# P1 Serial (direct cable, no intermediaries)
+python bridge.py --source=p1-serial
 ```
 
-The bridge defaults to Tibber for backwards compatibility. If you configured HomeWizard, you must explicitly specify which API version to use. This is intentional. I am not your butler.
+The bridge defaults to Tibber for backwards compatibility. If you configured HomeWizard or P1 Serial, you must explicitly specify your chosen source. This is intentional. I am not your butler.
 
 ### HomeWizard API Versions: A Brief Exercise in Patience
 
@@ -145,12 +150,43 @@ If this process feels unnecessarily convoluted, you are correct. Use v1 instead 
 **In summary:**
 v1 works everywhere but involves polling (sad). v2 is better but requires firmware >= 6.0 and a token creation ritual (tedious). Choose based on your tolerance for obsolescence versus bureaucracy.
 
+### P1 Serial: For The Purists
+
+If you prefer your data _unmediated_ by cloud services, Wi-Fi chipsets, or indeed any third-party hardware whatsoever, you may connect directly to the smart meter's P1 port using a USB-to-serial cable.
+
+**Requirements:**
+- A **P1 cable** (USB-to-RJ11, widely available for €10-30, or DIY if you enjoy soldering).
+- **DSMR v4+ meter** (115200 baud) or **DSMR v2/v3** (9600 baud, if your meter is vintage).
+- **Linux permissions** to access the serial port. If `/dev/ttyUSB0` returns "Permission denied," add yourself to the `dialout` group:
+  ```bash
+  sudo usermod -a -G dialout $USER
+  # Log out and back in. It is almost 2026; we should not still be fighting with serial port permissions.
+  ```
+
+**How it works:**
+The meter broadcasts DSMR telegrams every second over the P1 port. This implementation:
+- Reads raw telegrams via `pyserial`
+- Validates CRC16 checksums (polynomial 0xA001, for the pedants)
+- Parses OBIS codes `1-0:1.7.0` (consumption) and `1-0:2.7.0` (production)
+- Yields `PowerReading` objects to the bridge
+
+No HTTP requests. No GraphQL subscriptions. No WebSocket handshakes. Just bytes over a wire, as nature intended.
+
+**Debugging:**
+If the cable is not detected, verify it exists:
+```bash
+ls -la /dev/ttyUSB*
+```
+If nothing appears, check that the cable is actually plugged in. It happens to the best of us.
+
 ## Running as a Service (systemd)
 
 To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the universe takes hold:
 
 1. Edit the provided `lametric-power-bridge.service` to match your paths and user.
-   - If using HomeWizard, add `--source=homewizard-v1` to the `ExecStart` line. The service file defaults to Tibber, naturally.
+   - If using HomeWizard, add `--source=homewizard-v1` to the `ExecStart` line.
+   - If using P1 Serial, add `--source=p1-serial`.
+   - The service file defaults to Tibber, naturally.
 2. Copy to systemd:
     ```bash
     sudo cp lametric-power-bridge.service /etc/systemd/system/
@@ -170,7 +206,7 @@ To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the u
 - [x] Tibber Pulse Backend (GraphQL WSS)
 - [x] HomeWizard v1 API Backend (HTTP Polling) — _For those who trust Wi-Fi but distrust cloud services_
 - [x] HomeWizard v2 API Backend (WebSocket) — _Same device, slightly fancier protocol, requires recent firmware and a token ritual_
-- [ ] DSMR P1 Cable Backend (For those who prefer wires and have USB ports to spare)
+- [x] DSMR P1 Serial Backend — _For those who prefer wires, possess USB ports, and appreciate the purity of electrons over copper_
 - [ ] Multi-frame support (e.g., Gas usage, or perhaps the current price of tea)
 
 ## Acknowledgments
