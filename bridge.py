@@ -13,6 +13,7 @@ load_dotenv("lametric-power-bridge.env")
 from sources.tibber import TibberSource
 from sources.homewizard_v1 import HomeWizardV1Source
 from sources.homewizard_v2 import HomeWizardV2Source
+from sources.p1_serial import P1SerialSource
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
@@ -53,6 +54,11 @@ def get_source(source_name: str):
             sys.exit(1)
         logger.info(f"Using source: HomeWizard v2 API (WebSocket)")
         return HomeWizardV2Source(host=host, token=token)
+    elif source_name == "p1-serial":
+        device = os.getenv("P1_SERIAL_DEVICE", "/dev/ttyUSB0")
+        baudrate = int(os.getenv("P1_SERIAL_BAUDRATE", "115200"))
+        logger.info(f"Using source: P1 Serial (DSMR via {device} at {baudrate} baud)")
+        return P1SerialSource(device=device, baudrate=baudrate)
     else:
         logger.error(f"Unknown source: {source_name}")
         sys.exit(1)
@@ -114,7 +120,7 @@ if __name__ == "__main__":
         "--source",
         type=str,
         default="tibber",
-        choices=["tibber", "homewizard-v1", "homewizard-v2"],
+        choices=["tibber", "homewizard-v1", "homewizard-v2", "p1-serial"],
         help="Power source to use (default: tibber)"
     )
     args = parser.parse_args()
