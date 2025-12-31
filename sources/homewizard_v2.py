@@ -67,7 +67,7 @@ class HomeWizardV2Source:
         Phase 1: Validation.
 
         For v2 API, the WebSocket itself handles all bootstrapping.
-        This method exists to maintain PowerSource protocol compatibility.
+        This method validates configuration before attempting connection.
         """
         if not self.host:
             logger.error("HOMEWIZARD_HOST not configured")
@@ -149,19 +149,25 @@ class HomeWizardV2Source:
                     data = json.loads(message)
                     msg_type = data.get("type")
 
+                    # Debug: log all received messages
+                    logger.debug(f"HomeWizard v2: Received message type: {msg_type}, data: {data}")
+
                     if msg_type == "measurement":
                         # Power data arrives in the "data" field
                         payload = data.get("data", {})
-                        active_power = payload.get("active_power_w")
+                        # v2 API uses "power_w" (not "active_power_w" like v1)
+                        power = payload.get("power_w")
 
-                        if active_power is not None:
+                        if power is not None:
+                            # Also extract timestamp from v2 API (it does provide it!)
+                            timestamp = payload.get("timestamp")
                             yield PowerReading(
-                                power_watts=float(active_power),
-                                timestamp=None  # v2 API doesn't provide timestamps in measurements
+                                power_watts=float(power),
+                                timestamp=timestamp
                             )
                         else:
                             logger.debug(
-                                "HomeWizard v2: Measurement missing 'active_power_w' field "
+                                "HomeWizard v2: Measurement missing 'power_w' field "
                                 "(device may be initializing)"
                             )
 

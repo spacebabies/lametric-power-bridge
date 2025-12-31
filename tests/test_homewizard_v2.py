@@ -53,10 +53,10 @@ async def test_homewizard_v2_stream_yields_power_readings(mocker):
         json.dumps({"type": "authorization_requested", "data": {"api_version": "2.0.0"}}),
         # Auth confirmation
         json.dumps({"type": "authorized"}),
-        # Power measurements
-        json.dumps({"type": "measurement", "data": {"active_power_w": 1500}}),
-        json.dumps({"type": "measurement", "data": {"active_power_w": -500}}),
-        json.dumps({"type": "measurement", "data": {"active_power_w": 0}}),
+        # Power measurements (v2 API uses "power_w" not "active_power_w")
+        json.dumps({"type": "measurement", "data": {"power_w": 1500, "timestamp": "2025-12-31T12:00:00"}}),
+        json.dumps({"type": "measurement", "data": {"power_w": -500, "timestamp": "2025-12-31T12:00:01"}}),
+        json.dumps({"type": "measurement", "data": {"power_w": 0, "timestamp": "2025-12-31T12:00:02"}}),
     ]
 
     # Mock websocket connection
@@ -89,15 +89,17 @@ async def test_homewizard_v2_stream_yields_power_readings(mocker):
     # Verify first reading (consuming power)
     assert isinstance(readings[0], PowerReading)
     assert readings[0].power_watts == 1500.0
-    assert readings[0].timestamp is None  # v2 API doesn't provide timestamps
+    assert readings[0].timestamp == "2025-12-31T12:00:00"
 
     # Verify second reading (producing power)
     assert isinstance(readings[1], PowerReading)
     assert readings[1].power_watts == -500.0
+    assert readings[1].timestamp == "2025-12-31T12:00:01"
 
     # Verify third reading (neutral)
     assert isinstance(readings[2], PowerReading)
     assert readings[2].power_watts == 0.0
+    assert readings[2].timestamp == "2025-12-31T12:00:02"
 
     # Verify auth message was sent
     mock_websocket.send.assert_any_call(
@@ -162,8 +164,8 @@ async def test_homewizard_v2_stream_handles_auth_failure(mocker):
 
 
 @pytest.mark.asyncio
-async def test_homewizard_v2_stream_missing_active_power_field(mocker):
-    """Test that stream() handles missing active_power_w field gracefully"""
+async def test_homewizard_v2_stream_missing_power_field(mocker):
+    """Test that stream() handles missing power_w field gracefully"""
     source = HomeWizardV2Source(host="192.168.2.87", token="test-token-123")
 
     # Mock WebSocket messages
@@ -171,10 +173,10 @@ async def test_homewizard_v2_stream_missing_active_power_field(mocker):
         # Auth flow
         json.dumps({"type": "authorization_requested", "data": {"api_version": "2.0.0"}}),
         json.dumps({"type": "authorized"}),
-        # Measurement without active_power_w (device initializing)
+        # Measurement without power_w (device initializing)
         json.dumps({"type": "measurement", "data": {"wifi_ssid": "MyNetwork"}}),
         # Valid measurement
-        json.dumps({"type": "measurement", "data": {"active_power_w": 999}}),
+        json.dumps({"type": "measurement", "data": {"power_w": 999, "timestamp": "2025-12-31T12:00:00"}}),
     ]
 
     # Mock websocket connection
@@ -218,7 +220,7 @@ async def test_homewizard_v2_stream_ignores_unknown_message_types(mocker):
         json.dumps({"type": "device", "data": {"product_name": "P1 Meter"}}),
         json.dumps({"type": "system", "data": {"cloud_enabled": False}}),
         # Valid measurement
-        json.dumps({"type": "measurement", "data": {"active_power_w": 1234}}),
+        json.dumps({"type": "measurement", "data": {"power_w": 1234, "timestamp": "2025-12-31T12:00:00"}}),
     ]
 
     # Mock websocket connection
