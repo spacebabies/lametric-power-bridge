@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import ssl
 import sys
 from typing import AsyncIterator
 
@@ -28,8 +29,7 @@ class HomeWizardV2Source:
     def __init__(
         self,
         host: str,
-        token: str,
-        use_ssl: bool = False
+        token: str
     ):
         """
         Initialize HomeWizard v2 source.
@@ -37,7 +37,6 @@ class HomeWizardV2Source:
         Args:
             host: IP address or hostname of the device (e.g., "192.168.2.87")
             token: Local user authentication token
-            use_ssl: Use wss:// instead of ws:// (default: False for local devices)
         """
         if websockets is None:
             logger.error("websockets library not installed. Run: pip install websockets")
@@ -45,9 +44,14 @@ class HomeWizardV2Source:
 
         self.host = host
         self.token = token
-        self.use_ssl = use_ssl
-        protocol = "wss" if use_ssl else "ws"
-        self.ws_url = f"{protocol}://{host}/api/ws"
+        # v2 API uses WSS (WebSocket Secure) on port 443
+        self.ws_url = f"wss://{host}/api/ws"
+
+        # Create SSL context that ignores cert verification
+        # (HomeWizard uses self-signed certs with non-standard hostnames)
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
 
     async def __aenter__(self):
         """Context manager entry: connect to device"""
@@ -89,8 +93,7 @@ class HomeWizardV2Source:
         # WebSocket auto-reconnect loop
         async for websocket in websockets.connect(
             self.ws_url,
-            # HomeWizard uses self-signed cert for wss, disable verification
-            ssl=False if self.use_ssl else None
+            ssl=self.ssl_context
         ):
             try:
                 # --- STEP A: Wait for Authorization Request ---

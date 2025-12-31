@@ -15,7 +15,7 @@ async def test_homewizard_v2_connect_success():
     # Verify config was accepted
     assert source.host == "192.168.2.87"
     assert source.token == "test-token-123"
-    assert source.ws_url == "ws://192.168.2.87/api/ws"
+    assert source.ws_url == "wss://192.168.2.87/api/ws"
 
 
 @pytest.mark.asyncio
