@@ -4,7 +4,7 @@ A mildly adequate solution for obsessively watching your money burn in real-time
 
 ![Photo of a LaMetric Time with "⚡️ 3517 W" on its display](https://github.com/user-attachments/assets/38b71bdb-2986-449c-b10c-d7640edbeb6d)
 
-Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements from various sources (**Tibber Pulse** via WebSocket, or **HomeWizard Energy** devices via HTTP/WebSocket, with P1 Serial support coming when I can be bothered) and pushes live wattage updates directly to your LaMetric device via the local network.
+Designed to run as a background service on a local server (Debian/Raspberry Pi), this tool connects to realtime power measurements from various sources (Tibber Pulse via WebSocket, or [HomeWizard P1 Meter](https://www.homewizard.com/p1-meter/) via HTTP/WebSocket, with P1 Serial support coming when I can be bothered) and pushes live wattage updates directly to your LaMetric device via the local network.
 
 I built this because routing your living room's energy data through a server in Virginia just to display a number three feet away seemed a bit excessive.
 
@@ -112,19 +112,26 @@ HomeWizard, in their infinite wisdom, has blessed us with **two distinct API ver
 
 ##### Creating a Local User Token (v2 API Only)
 
-The v2 API requires authentication via a local user token. This token is _not_ your Wi-Fi password, nor is it available in any app. You must conjure it yourself using the device's REST API.
+The v2 API requires [authentication](https://api-documentation.homewizard.com/docs/v2/authorization) via a local user token. This token is _not_ your Wi-Fi password, nor is it available in any app. You must conjure it yourself using the device's REST API.
 
 **Step 1:** Create a new local user (replace `YOUR_IP` with your device IP):
 
 ```bash
-curl -X POST http://YOUR_IP/api/v1/user \
+curl http://YOUR_IP/api/user \
+  --insecure \
+  -X POST \
   -H "Content-Type: application/json" \
-  -d '{"name": "lametric-bridge", "password": "your_secure_password_here"}'
+  -H "X-Api-Version: 2" \
+  -d '{"name": "local/lametric-power-bridge"}'
 ```
 
-**Step 2:** The device will respond with a JSON object containing your `token`. Copy this token and paste it into your `lametric-power-bridge.env` file as `HOMEWIZARD_TOKEN`.
+The API will respond with an error. This is fine.
 
-**Step 3:** Never lose this token. The device will not remind you what it was, and you will have to create a new user if you forget it.
+**Step 2:** Press the physical button on the device and repeat the exact same request. And do it with zest, because this is a time-sensitive dance.
+
+**Step 3:** The device will now respond with a JSON object containing your `token`. Copy this token and paste it into your `lametric-power-bridge.env` file as `HOMEWIZARD_TOKEN`.
+
+Never lose this token. The device will not remind you what it was, and you will have to create a new user if you forget it.
 
 If this process feels unnecessarily convoluted, you are correct. Use v1 instead and save yourself the trouble.
 
