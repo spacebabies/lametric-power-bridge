@@ -12,6 +12,7 @@ load_dotenv("lametric-power-bridge.env")
 
 from sources.tibber import TibberSource
 from sources.homewizard_v1 import HomeWizardV1Source
+from sources.homewizard_v2 import HomeWizardV2Source
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
@@ -41,6 +42,17 @@ def get_source(source_name: str):
             sys.exit(1)
         logger.info(f"Using source: HomeWizard v1 API (HTTP polling)")
         return HomeWizardV1Source(host=host)
+    elif source_name == "homewizard-v2":
+        host = os.getenv("HOMEWIZARD_HOST")
+        token = os.getenv("HOMEWIZARD_TOKEN")
+        if not host:
+            logger.error("HomeWizard v2: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
+            sys.exit(1)
+        if not token:
+            logger.error("HomeWizard v2: HOMEWIZARD_TOKEN not configured in lametric-power-bridge.env")
+            sys.exit(1)
+        logger.info(f"Using source: HomeWizard v2 API (WebSocket)")
+        return HomeWizardV2Source(host=host, token=token)
     else:
         logger.error(f"Unknown source: {source_name}")
         sys.exit(1)
@@ -102,7 +114,7 @@ if __name__ == "__main__":
         "--source",
         type=str,
         default="tibber",
-        choices=["tibber", "homewizard-v1"],
+        choices=["tibber", "homewizard-v1", "homewizard-v2"],
         help="Power source to use (default: tibber)"
     )
     args = parser.parse_args()
