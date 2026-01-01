@@ -4,7 +4,7 @@ import json
 import logging
 import ssl
 import sys
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 try:
     import websockets
@@ -12,6 +12,7 @@ except ImportError:
     websockets = None
 
 from sources.base import PowerReading
+from sources.discovery import discover_homewizard
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +29,17 @@ class HomeWizardV2Source:
 
     def __init__(
         self,
-        host: str,
-        token: str
+        host: Optional[str] = None,
+        token: Optional[str] = None,
+        discovery_timeout: float = 10.0
     ):
         """
         Initialize HomeWizard v2 source.
 
         Args:
-            host: IP address or hostname of the device (e.g., "192.168.2.87")
-            token: Local user authentication token
+            host: IP address or hostname (optional, will auto-discover if not provided)
+            token: Local user authentication token (required)
+            discovery_timeout: Device discovery timeout in seconds (default: 10.0)
         """
         if websockets is None:
             logger.error("websockets library not installed. Run: pip install websockets")
@@ -44,8 +47,9 @@ class HomeWizardV2Source:
 
         self.host = host
         self.token = token
+        self.discovery_timeout = discovery_timeout
         # v2 API uses WSS (WebSocket Secure) on port 443
-        self.ws_url = f"wss://{host}/api/ws"
+        self.ws_url = f"wss://{host}/api/ws" if host else None
 
         # Create SSL context that ignores cert verification
         # (HomeWizard uses self-signed certs with non-standard hostnames)
@@ -64,14 +68,28 @@ class HomeWizardV2Source:
 
     async def connect(self) -> None:
         """
-        Phase 1: Validation.
+        Phase 1: Discovery + Validation.
 
-        For v2 API, the WebSocket itself handles all bootstrapping.
-        This method validates configuration before attempting connection.
+        Discovers device if host not provided, then validates configuration.
         """
+        # If no host provided, discover via mDNS
         if not self.host:
-            logger.error("HOMEWIZARD_HOST not configured")
-            sys.exit(1)
+            logger.info("HomeWizard v2: No host configured, attempting discovery...")
+            discovered_ip = await discover_homewizard(timeout=self.discovery_timeout)
+
+            if not discovered_ip:
+                logger.error(
+                    "HomeWizard v2: Discovery failed. No device found on network. "
+                    "Set HOMEWIZARD_HOST manually if device is not broadcasting mDNS."
+                )
+                sys.exit(1)
+                return  # For test mocking: prevent further execution
+
+            self.host = discovered_ip
+            logger.info(f"HomeWizard v2: Discovered device at {self.host}")
+
+        # Construct WebSocket URL now that we have a host
+        self.ws_url = f"wss://{self.host}/api/ws"
 
         if not self.token:
             logger.error("HOMEWIZARD_TOKEN not configured")
@@ -81,14 +99,17 @@ class HomeWizardV2Source:
 
     async def stream(self) -> AsyncIterator[PowerReading]:
         """
-        Phase 2: WebSocket Stream.
+        Phase 2: WebSocket Stream with Re-discovery.
 
         Connects to the device WebSocket, authenticates, subscribes to
         measurement updates, and yields PowerReading objects as they arrive.
 
-        Handles auto-reconnect on connection loss.
+        Handles auto-reconnect and re-discovery on persistent connection loss.
         """
         logger.info(f"HomeWizard v2: Connecting to {self.ws_url}")
+
+        consecutive_failures = 0
+        max_failures = 3
 
         # WebSocket auto-reconnect loop
         async for websocket in websockets.connect(
@@ -179,11 +200,55 @@ class HomeWizardV2Source:
                         # Ignore unknown message types (device info, system updates, etc.)
                         logger.debug(f"HomeWizard v2: Ignoring message type: {msg_type}")
 
+                # Reset failure counter on successful connection
+                consecutive_failures = 0
+
             except websockets.ConnectionClosed as e:
-                logger.warning(f"HomeWizard v2: Connection closed: {e}. Reconnecting in 5s...")
+                consecutive_failures += 1
+                logger.warning(
+                    f"HomeWizard v2: Connection closed: {e}. "
+                    f"Failure {consecutive_failures}/{max_failures}"
+                )
+
+                # After 3 failures, try re-discovery (IP might have changed)
+                if consecutive_failures >= max_failures:
+                    logger.warning("HomeWizard v2: Attempting re-discovery...")
+                    discovered_ip = await discover_homewizard(timeout=self.discovery_timeout)
+
+                    if discovered_ip and discovered_ip != self.host:
+                        logger.info(
+                            f"HomeWizard v2: Device IP changed: {self.host} → {discovered_ip}"
+                        )
+                        self.host = discovered_ip
+                        self.ws_url = f"wss://{self.host}/api/ws"
+                        consecutive_failures = 0  # Reset counter after re-discovery
+                    elif discovered_ip == self.host:
+                        logger.debug("HomeWizard v2: Re-discovery found same IP")
+
+                logger.info("HomeWizard v2: Reconnecting in 5s...")
                 await asyncio.sleep(5)
                 continue
+
             except Exception as e:
-                logger.error(f"HomeWizard v2: Unexpected error: {e}. Reconnecting in 5s...")
+                consecutive_failures += 1
+                logger.error(
+                    f"HomeWizard v2: Unexpected error: {e}. "
+                    f"Failure {consecutive_failures}/{max_failures}"
+                )
+
+                # Try re-discovery after persistent failures
+                if consecutive_failures >= max_failures:
+                    logger.warning("HomeWizard v2: Attempting re-discovery...")
+                    discovered_ip = await discover_homewizard(timeout=self.discovery_timeout)
+
+                    if discovered_ip and discovered_ip != self.host:
+                        logger.info(
+                            f"HomeWizard v2: Device IP changed: {self.host} → {discovered_ip}"
+                        )
+                        self.host = discovered_ip
+                        self.ws_url = f"wss://{self.host}/api/ws"
+                        consecutive_failures = 0
+
+                logger.info("HomeWizard v2: Reconnecting in 5s...")
                 await asyncio.sleep(5)
                 continue

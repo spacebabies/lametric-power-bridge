@@ -264,3 +264,41 @@ async def test_homewizard_v2_context_manager(mocker):
 
     # Verify context manager worked
     assert source_created is True
+
+
+@pytest.mark.asyncio
+async def test_homewizard_v2_connect_with_discovery(mocker):
+    """Test HomeWizard v2 connection with auto-discovery"""
+    # Create source without host (triggers discovery)
+    source = HomeWizardV2Source(host=None, token="test-token-123")
+
+    # Mock discovery
+    mock_discover = mocker.patch(
+        'sources.homewizard_v2.discover_homewizard',
+        return_value="192.168.1.87"
+    )
+
+    # Connect
+    await source.connect()
+
+    # Verify discovery was called
+    mock_discover.assert_called_once()
+
+    # Verify host was set to discovered IP
+    assert source.host == "192.168.1.87"
+    assert source.ws_url == "wss://192.168.1.87/api/ws"
+
+
+@pytest.mark.asyncio
+async def test_homewizard_v2_connect_discovery_failure_exits(mocker):
+    """Test that connect exits when discovery fails"""
+    source = HomeWizardV2Source(host=None, token="test-token")
+
+    # Mock discovery failure (returns None)
+    mocker.patch('sources.homewizard_v2.discover_homewizard', return_value=None)
+    mock_exit = mocker.patch('sources.homewizard_v2.sys.exit')
+
+    await source.connect()
+
+    # Verify sys.exit was called
+    mock_exit.assert_called_once_with(1)
