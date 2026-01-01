@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from sources.homewizard_v1 import HomeWizardV1Source
 from sources.base import PowerReading
 
@@ -218,3 +219,100 @@ async def test_homewizard_context_manager(mocker):
 
     # Verify cleanup was called on exit
     mock_client.aclose.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_homewizard_connect_with_discovery(mocker):
+    """Test HomeWizard v1 connection with auto-discovery"""
+    # Create source without host (triggers discovery)
+    source = HomeWizardV1Source(host=None)
+
+    # Mock discovery
+    mock_discover = mocker.patch(
+        'sources.homewizard_v1.discover_homewizard',
+        return_value="192.168.1.87"
+    )
+
+    # Mock httpx.AsyncClient
+    mock_client = mocker.AsyncMock()
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"active_power_w": 1500}
+    mock_response.raise_for_status = mocker.Mock()
+    mock_client.get.return_value = mock_response
+
+    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+
+    # Connect
+    await source.connect()
+
+    # Verify discovery was called
+    mock_discover.assert_called_once()
+
+    # Verify host was set to discovered IP
+    assert source.host == "192.168.1.87"
+    assert source.base_url == "http://192.168.1.87/api/v1/data"
+
+
+@pytest.mark.asyncio
+async def test_homewizard_connect_discovery_failure_exits(mocker):
+    """Test that connect exits when discovery fails"""
+    source = HomeWizardV1Source(host=None)
+
+    # Mock discovery failure (returns None)
+    mocker.patch('sources.homewizard_v1.discover_homewizard', return_value=None)
+    mock_exit = mocker.patch('sources.homewizard_v1.sys.exit')
+
+    await source.connect()
+
+    # Verify sys.exit was called
+    mock_exit.assert_called_once_with(1)
+
+
+@pytest.mark.asyncio
+async def test_homewizard_stream_rediscovers_on_ip_change(mocker):
+    """Test that stream re-discovers device when IP changes"""
+    source = HomeWizardV1Source(host="192.168.1.87", poll_interval=0.01)
+
+    # Mock client
+    mock_client = mocker.AsyncMock()
+
+    # First 3 calls fail (ConnectError)
+    mock_client.get.side_effect = [
+        httpx.ConnectError("Connection refused"),
+        httpx.ConnectError("Connection refused"),
+        httpx.ConnectError("Connection refused"),
+        # After re-discovery, success
+        mocker.Mock(
+            status_code=200,
+            json=lambda: {"active_power_w": 999},
+            raise_for_status=mocker.Mock()
+        )
+    ]
+
+    source.client = mock_client
+
+    # Mock re-discovery returning new IP
+    mock_discover = mocker.patch(
+        'sources.homewizard_v1.discover_homewizard',
+        return_value="192.168.1.88"  # New IP
+    )
+
+    # Mock sleep
+    mocker.patch('sources.homewizard_v1.asyncio.sleep')
+
+    # Collect one reading
+    readings = []
+    async for reading in source.stream():
+        readings.append(reading)
+        break
+
+    # Verify re-discovery was triggered
+    mock_discover.assert_called_once()
+
+    # Verify host was updated
+    assert source.host == "192.168.1.88"
+    assert source.base_url == "http://192.168.1.88/api/v1/data"
+
+    # Verify we got the reading after recovery
+    assert len(readings) == 1
+    assert readings[0].power_watts == 999.0
