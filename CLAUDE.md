@@ -122,6 +122,41 @@ class YourSource:
 - **Sinks**: Alleen data formatteren en versturen
 - **Bridge**: Alleen orchestratie (geen business logic)
 
+### 5. Discovery-First Architecture
+
+**Problem**: DHCP lease changes cause IP address shifts, breaking static configuration.
+
+**Solution**: Automatic device discovery via mDNS (HomeWizard) and SSDP (LaMetric).
+
+**Discovery Module** (`sources/discovery.py`):
+```python
+async def discover_homewizard(timeout: float = 10.0) -> Optional[str]:
+    """Discover HomeWizard P1 Meter via mDNS (_hwenergy._tcp)"""
+
+async def discover_lametric(timeout: float = 10.0) -> Optional[str]:
+    """Discover LaMetric Time via SSDP (urn:schemas-upnp-org:device:LaMetric:1)"""
+```
+
+**Libraries**:
+- `zeroconf >= 0.132.0` for mDNS (HomeWizard)
+- `async-upnp-client >= 0.38.0` for SSDP (LaMetric)
+
+**Discovery Flow**:
+1. **Bootstrap**: If `host`/`url` not configured → discovery runs (10s timeout)
+2. **Cache**: Discovered IP stored in source/sink instance
+3. **Runtime Recovery**: Re-discovery triggers after 3 consecutive connection failures
+4. **Manual Override**: Configured `host`/`url` always takes precedence (skips discovery)
+
+**Performance**:
+- First run: ~3-8s added to startup (discovery time)
+- Runtime: Zero overhead (IP cached, re-discovery only on failure)
+
+**Tradeoffs**:
+- ✅ Eliminates DHCP IP change failures
+- ✅ Simpler configuration (no manual IPs needed)
+- ❌ Adds startup delay on first run
+- ❌ Requires mDNS/SSDP multicast (firewall/subnet dependent)
+
 ---
 
 ## Bestandsstructuur
@@ -132,19 +167,22 @@ lametric-power-bridge/
 ├── sources/                     # Ingress modules
 │   ├── __init__.py
 │   ├── base.py                 # PowerReading + PowerSource Protocol
+│   ├── discovery.py            # mDNS/SSDP device discovery
 │   ├── tibber.py               # Tibber WebSocket implementatie
-│   ├── homewizard_v1.py        # HomeWizard P1 Meter (v1 HTTP API)
-│   ├── homewizard_v2.py        # HomeWizard P1 Meter (v2 WebSocket - TODO)
+│   ├── homewizard_v1.py        # HomeWizard P1 Meter (v1 HTTP API + discovery)
+│   ├── homewizard_v2.py        # HomeWizard P1 Meter (v2 WebSocket + discovery)
 │   └── p1_serial.py            # DSMR P1 Serial (TODO)
 ├── sinks/
 │   ├── __init__.py
-│   └── lametric.py             # LaMetric formatting + HTTP push
+│   └── lametric.py             # LaMetric class-based sink + SSDP discovery
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py             # pytest fixtures
-│   ├── test_lametric.py        # Sink tests (6 tests)
+│   ├── test_discovery.py       # Discovery tests (7 tests)
+│   ├── test_lametric.py        # Sink tests (10 tests)
 │   ├── test_tibber.py          # Tibber source tests (3 tests)
-│   ├── test_homewizard_v1.py   # HomeWizard P1 v1 tests (6 tests)
+│   ├── test_homewizard_v1.py   # HomeWizard P1 v1 tests (10 tests)
+│   ├── test_homewizard_v2.py   # HomeWizard P1 v2 tests (10 tests)
 │   └── test_bridge.py          # Bridge logic tests (3 tests)
 ├── lametric-power-bridge.env    # Configuration (all sources)
 ├── requirements.txt
@@ -703,6 +741,14 @@ checking if dinner is ready."
 
 ## Changelog
 
+- **2026-01-01**: **Discovery-First Architecture** - Complete rewrite voor DHCP-resilience (43 tests)
+  - New: `sources/discovery.py` module with mDNS (HomeWizard) and SSDP (LaMetric) discovery
+  - Updated: All HomeWizard sources now support auto-discovery with re-discovery on IP changes
+  - Updated: LaMetric sink refactored to class-based design with auto-discovery
+  - Updated: Bridge now supports optional host/URL (discovery-first, manual override possible)
+  - Dependencies: Added `zeroconf>=0.132.0` and `async-upnp-client>=0.38.0`
+  - Breaking: `HOMEWIZARD_HOST` and `LAMETRIC_URL` now optional (recommended to leave empty)
+  - Learning: Discovery adds ~3-8s startup time but eliminates DHCP IP change failures
 - **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
 - **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-v1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
