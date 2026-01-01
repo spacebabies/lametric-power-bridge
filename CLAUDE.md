@@ -457,7 +457,7 @@ load_dotenv("lametric-power-bridge.env")
 **Variabelen**:
 - `TIBBER_TOKEN`: Tibber API token (verplicht voor `--source=tibber`)
 - `HOMEWIZARD_HOST`: HomeWizard P1 host IP (verplicht voor `--source=homewizard-v1`)
-- `LAMETRIC_URL`: LaMetric Push URL (verplicht voor alle sources)
+- `LAMETRIC_URL`: LaMetric Push URL (optioneel - auto-discovery via SSDP, alleen handmatig configureren bij 0 of 2+ devices)
 - `LAMETRIC_API_KEY`: LaMetric API key (verplicht voor alle sources)
 
 ---
@@ -703,6 +703,7 @@ checking if dinner is ready."
 
 ## Changelog
 
+- **2026-01-01**: LaMetric Time SSDP auto-discovery toegevoegd (LAMETRIC_URL nu optioneel, handles DHCP lease renewals, 12 LaMetric tests total)
 - **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
 - **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-v1`, HTTP polling, 18 tests total)
 - **2025-12-28**: CLI source selection toegevoegd (STAP 5: `--source` argument, 12 tests total)
