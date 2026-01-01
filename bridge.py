@@ -27,31 +27,31 @@ logger = logging.getLogger(__name__)
 STALE_DATA_TIMEOUT = 60
 
 def get_source(source_name: str):
-    """Initialize the selected power source with hard fail on misconfiguration"""
+    """Initialize the selected power source with discovery-first approach"""
     if source_name == "tibber":
         token = os.getenv("TIBBER_TOKEN")
         if not token:
             logger.error("Tibber: TIBBER_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
-        logger.info(f"Using source: Tibber")
+        logger.info("Using source: Tibber")
         return TibberSource(token=token)
     elif source_name == "homewizard-v1":
-        host = os.getenv("HOMEWIZARD_HOST")
-        if not host:
-            logger.error("HomeWizard v1: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
-            sys.exit(1)
-        logger.info(f"Using source: HomeWizard v1 API (HTTP polling)")
+        host = os.getenv("HOMEWIZARD_HOST")  # Optional now
+        if host:
+            logger.info(f"Using source: HomeWizard v1 (manual host: {host})")
+        else:
+            logger.info("Using source: HomeWizard v1 (auto-discovery)")
         return HomeWizardV1Source(host=host)
     elif source_name == "homewizard-v2":
-        host = os.getenv("HOMEWIZARD_HOST")
+        host = os.getenv("HOMEWIZARD_HOST")  # Optional now
         token = os.getenv("HOMEWIZARD_TOKEN")
-        if not host:
-            logger.error("HomeWizard v2: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
-            sys.exit(1)
         if not token:
             logger.error("HomeWizard v2: HOMEWIZARD_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
-        logger.info(f"Using source: HomeWizard v2 API (WebSocket)")
+        if host:
+            logger.info(f"Using source: HomeWizard v2 (manual host: {host})")
+        else:
+            logger.info("Using source: HomeWizard v2 (auto-discovery)")
         return HomeWizardV2Source(host=host, token=token)
     else:
         logger.error(f"Unknown source: {source_name}")
