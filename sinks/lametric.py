@@ -37,7 +37,6 @@ M_SEARCH_MSG = "\r\n".join([
 # Discovery state
 _discovered_ip = None
 _discovery_attempted = False
-_warned_no_url = False  # Track if we've already warned about missing URL
 
 
 class _SSDPDiscoveryProtocol(asyncio.DatagramProtocol):
@@ -194,18 +193,14 @@ async def send_http_payload(payload):
     """
     Offloads the blocking HTTP request to a thread with discovery support.
     """
-    global _warned_no_url
-
     url = await _get_lametric_url()
 
     if not url:
-        # Only warn once to avoid log spam (discovery already logged the issue)
-        if not _warned_no_url:
-            _warned_no_url = True
-            logger.warning(
-                "LaMetric: No URL available. Either discovery failed or found multiple devices. "
-                "Configure LAMETRIC_URL manually to proceed."
-            )
+        # Debug level - discovery already logged the actual issue at WARNING
+        logger.debug(
+            "LaMetric: No URL available. Either discovery failed or found multiple devices. "
+            "Configure LAMETRIC_URL manually to proceed."
+        )
         return
 
     if not LAMETRIC_API_KEY:

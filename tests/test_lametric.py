@@ -162,7 +162,7 @@ async def test_discovery_finds_one_device(mocker):
 
 
 @pytest.mark.asyncio
-async def test_discovery_finds_zero_devices(mocker, caplog):
+async def test_discovery_finds_zero_devices(mocker):
     """Test SSDP discovery finding no devices (requires manual config)"""
     # Reset discovery state
     lametric_module._discovered_ip = None
@@ -185,9 +185,6 @@ async def test_discovery_finds_zero_devices(mocker, caplog):
 
     # Verify NO request was made (no device found)
     mock_to_thread.assert_not_called()
-
-    # Verify warning was logged
-    assert "No URL available" in caplog.text
 
 
 @pytest.mark.asyncio
