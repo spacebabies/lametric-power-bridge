@@ -157,11 +157,6 @@ If you prefer your data _unmediated_ by cloud services, Wi-Fi chipsets, or indee
 **Requirements:**
 - A **P1 cable** (USB-to-RJ11, widely available for €10-30, or DIY if you enjoy soldering).
 - **DSMR v4+ meter** (115200 baud) or **DSMR v2/v3** (9600 baud, if your meter is vintage).
-- **Linux permissions** to access the serial port. If `/dev/ttyUSB0` returns "Permission denied," add yourself to the `dialout` group:
-  ```bash
-  sudo usermod -a -G dialout $USER
-  # Log out and back in. It is almost 2026; we should not still be fighting with serial port permissions.
-  ```
 
 **How it works:**
 The meter broadcasts DSMR telegrams every second over the P1 port. This implementation:
@@ -184,9 +179,7 @@ If nothing appears, check that the cable is actually plugged in. It happens to t
 To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the universe takes hold:
 
 1. Edit the provided `lametric-power-bridge.service` to match your paths and user.
-   - If using HomeWizard, add `--source=homewizard-v1` to the `ExecStart` line.
-   - If using P1 Serial, add `--source=p1-serial`.
-   - The service file defaults to Tibber, naturally.
+   - Configure your choice of input by adding `--source=<SOURCE>` to the `ExecStart` line.
 2. Copy to systemd:
     ```bash
     sudo cp lametric-power-bridge.service /etc/systemd/system/
