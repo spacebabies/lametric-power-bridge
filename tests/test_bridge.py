@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from bridge import get_source
 from sources.tibber import TibberSource
+from sources.p1_serial import P1SerialSource
 
 
 class TestGetSource:
@@ -36,3 +37,25 @@ class TestGetSource:
             get_source("invalid_source")
 
         assert exc_info.value.code == 1
+
+    def test_get_source_p1_serial_success(self, monkeypatch):
+        """Test P1 Serial source initialization with valid device"""
+        monkeypatch.setenv("P1_SERIAL_DEVICE", "/dev/ttyUSB0")
+        monkeypatch.setenv("P1_SERIAL_BAUDRATE", "115200")
+
+        source = get_source("p1-serial")
+
+        assert isinstance(source, P1SerialSource)
+        assert source.device == "/dev/ttyUSB0"
+        assert source.baudrate == 115200
+
+    def test_get_source_p1_serial_defaults(self, monkeypatch):
+        """Test P1 Serial source uses defaults when env vars not set"""
+        monkeypatch.delenv("P1_SERIAL_DEVICE", raising=False)
+        monkeypatch.delenv("P1_SERIAL_BAUDRATE", raising=False)
+
+        source = get_source("p1-serial")
+
+        assert isinstance(source, P1SerialSource)
+        assert source.device == "/dev/ttyUSB0"  # Default
+        assert source.baudrate == 115200  # Default
