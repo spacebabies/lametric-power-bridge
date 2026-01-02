@@ -56,7 +56,26 @@ class _SSDPDiscoveryProtocol(asyncio.DatagramProtocol):
         logger.debug(f"LaMetric: Sent M-SEARCH to {SSDP_ADDR}:{SSDP_PORT}")
 
     def datagram_received(self, data: bytes, addr: tuple):
-        """Accept packets from ANY source port (LaMetric uses port 49153)"""
+        """
+        Accept SSDP responses from ANY source port.
+
+        SECURITY NOTE: This deliberately does NOT filter by source port (unlike most
+        SSDP libraries which enforce port 1900). Here's why:
+
+        1. LaMetric devices respond from ephemeral ports (e.g., 49153), not port 1900
+        2. Filtering by port would break discovery entirely
+        3. The security risk is acceptable because:
+           - Requires attacker on local network (if LAN is breached, bigger problems exist)
+           - Data sent to LaMetric is non-sensitive (power consumption readings)
+           - LaMetric API requires authentication (LAMETRIC_API_KEY)
+           - Attack window is small (~10 second discovery timeout)
+
+        Port 1900 filtering in libraries protects against SSDP reflection/amplification
+        DDoS attacks, but we're the client (not server), so that doesn't apply here.
+
+        An attacker could spoof SSDP responses to redirect traffic, but they would need
+        LAN access AND the LaMetric API key to impersonate the device successfully.
+        """
         try:
             message = data.decode("utf-8", errors="ignore")
 
