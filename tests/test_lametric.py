@@ -143,11 +143,11 @@ async def test_discovery_finds_one_device(mocker):
     mocker.patch('sinks.lametric.LAMETRIC_URL', None)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock async_search to return one device
-    async def mock_search(timeout, search_target):
-        yield {"location": "http://192.168.1.100:8080/description.xml"}
+    # Mock _discover_lametric to return one device
+    async def mock_discover(timeout=10.0):
+        return "192.168.1.100"
 
-    mocker.patch('sinks.lametric.async_search', mock_search)
+    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push which should trigger discovery
@@ -172,13 +172,11 @@ async def test_discovery_finds_zero_devices(mocker, caplog):
     mocker.patch('sinks.lametric.LAMETRIC_URL', None)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock async_search to return no devices
-    async def mock_search(timeout, search_target):
-        # Empty generator (no devices found)
-        return
-        yield  # Unreachable, makes this a generator
+    # Mock _discover_lametric to return None (no devices)
+    async def mock_discover(timeout=10.0):
+        return None
 
-    mocker.patch('sinks.lametric.async_search', mock_search)
+    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push which should trigger discovery
@@ -189,12 +187,12 @@ async def test_discovery_finds_zero_devices(mocker, caplog):
     mock_to_thread.assert_not_called()
 
     # Verify warning was logged
-    assert "No devices found via SSDP discovery" in caplog.text
+    assert "No URL available" in caplog.text
 
 
 @pytest.mark.asyncio
-async def test_discovery_finds_multiple_devices(mocker, caplog):
-    """Test SSDP discovery finding 2+ devices (requires manual config)"""
+async def test_discovery_finds_multiple_devices(mocker):
+    """Test SSDP discovery with new protocol (returns first device found)"""
     # Reset discovery state
     lametric_module._discovered_ip = None
     lametric_module._discovery_attempted = False
@@ -203,24 +201,23 @@ async def test_discovery_finds_multiple_devices(mocker, caplog):
     mocker.patch('sinks.lametric.LAMETRIC_URL', None)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock async_search to return multiple devices
-    async def mock_search(timeout, search_target):
-        yield {"location": "http://192.168.1.100:8080/description.xml"}
-        yield {"location": "http://192.168.1.101:8080/description.xml"}
+    # Mock _discover_lametric to return first device found
+    # (New implementation returns immediately on first match)
+    async def mock_discover(timeout=10.0):
+        return "192.168.1.100"
 
-    mocker.patch('sinks.lametric.async_search', mock_search)
+    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push which should trigger discovery
     reading = PowerReading(power_watts=1500)
     await push_to_lametric(reading)
 
-    # Verify NO request was made (ambiguous discovery)
-    mock_to_thread.assert_not_called()
+    # Verify request was made to first discovered device
+    mock_to_thread.assert_called_once()
 
-    # Verify warning was logged about multiple devices
-    assert "Found 2 devices" in caplog.text
-    assert "Set LAMETRIC_URL manually" in caplog.text
+    # Verify IP was cached
+    assert lametric_module._discovered_ip == "192.168.1.100"
 
 
 @pytest.mark.asyncio
@@ -235,8 +232,8 @@ async def test_manual_url_skips_discovery(mocker):
     mocker.patch('sinks.lametric.LAMETRIC_URL', manual_url)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock async_search (should NOT be called)
-    mock_search = mocker.patch('sinks.lametric.async_search')
+    # Mock _discover_lametric (should NOT be called)
+    mock_discover = mocker.patch('sinks.lametric._discover_lametric')
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push
@@ -247,7 +244,7 @@ async def test_manual_url_skips_discovery(mocker):
     mock_to_thread.assert_called_once()
 
     # Verify discovery was NOT called
-    mock_search.assert_not_called()
+    mock_discover.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -314,11 +311,11 @@ async def test_discovery_only_runs_once(mocker):
     mocker.patch('sinks.lametric.LAMETRIC_URL', None)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock async_search to return one device
-    async def mock_search(timeout, search_target):
-        yield {"location": "http://192.168.1.100:8080/description.xml"}
+    # Mock _discover_lametric to return one device
+    async def mock_discover(timeout=10.0):
+        return "192.168.1.100"
 
-    mock_async_search = mocker.patch('sinks.lametric.async_search', mock_search)
+    mock_discover_fn = mocker.patch('sinks.lametric._discover_lametric', side_effect=mock_discover)
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push multiple times
@@ -330,6 +327,7 @@ async def test_discovery_only_runs_once(mocker):
     # Verify discovery only ran once (IP cached after first call)
     assert lametric_module._discovery_attempted == True
     assert lametric_module._discovered_ip == "192.168.1.100"
+    assert mock_discover_fn.call_count == 1
 
     # All three pushes should succeed with cached IP
     assert mock_to_thread.call_count == 3
