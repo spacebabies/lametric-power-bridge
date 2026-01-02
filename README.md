@@ -10,7 +10,7 @@ I built this because routing your living room's energy data through a server in 
 
 ## Features
 
-* **Real-time-ish:** Updates as fast as the source allows. If Tibber is lagging, we lag. We are a bridge, not a time machine.
+* **Real-time-ish:** Updates as fast as the source allows. If they lag, we lag. We are a bridge, not a time machine.
 * **Local Push:** Uses LaMetric's Local API. We prefer our packets free-range and organic.
 * **Visual Feedback:** Displays a yellow lightning bolt (⚡️) when you are paying, and a green one (EMOJI_INEXPLICABLY_MISSING_FROM_UNICODE) when nature is paying you. Simple shapes for complex financial anxiety.
 * **Robust:** "Fail-safe." This is a technical term meaning "it crashes with dignity and restarts before you notice."
@@ -20,7 +20,7 @@ I built this because routing your living room's energy data through a server in 
 
 The application utilizes a bespoke, highly sophisticated "pluggable architecture." In layman's terms, it is a Python script in three trench coats:
 
-1.  **Ingress (Source):** Reluctantly accepts data from the provider (Tibber via GraphQL/WSS, or HomeWizard via HTTP/WebSocket, because variety is the spice of unnecessary complexity).
+1.  **Ingress (Source):** Reluctantly accepts data from a choice of providers (because variety is the spice of unnecessary complexity).
 2.  **Logic:** Performs complex mathematical wizardry (it checks if the number is negative).
 3.  **Egress (Sink):** Shouts the result at the LaMetric device until it complies.
 
@@ -28,12 +28,12 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 
 ### Prerequisites
 
-*   **Python 3.9+** (It is almost 2026; please keep up).
+*   **Python 3.9+** (It is 2026; please keep up).
 *   **A LaMetric Time device** (An expensive pixel clock that has no business costing this much).
 *   **A "smart" electricity meter** (A digital spy kindly forced upon you by the grid operator to "modernize" your ability to be monitored).
 *   **One of the following data sources:**
     *   **Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
-    *   **HomeWizard Energy** device (A tiny box that sits between your smart meter and your Wi-Fi router, politely asking for permission to read numbers once per second. Refreshingly local, which is the entire point).
+    *   **HomeWizard P1 Meter** (A tiny box that sits between your smart meter and your Wi-Fi router, politely asking for permission to read numbers once per second. Refreshingly local, which is the entire point).
 
 ### 0. LaMetric Time Configuration
 
@@ -41,7 +41,9 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 2.  Click the `+` sign (Market).
 3.  Add **My Data DIY**, published by LaMetric.
 4.  Give it a name and choose **HTTP Push**.
-5.  Note the **Push URL**. You will need this later. Do not lose it.
+5.  Grab the **API Key** from the [developer portal](https://developer.lametric.com/user/devices). (2022 models or later also show this in the app)
+
+The bridge will discover your LaMetric Time device on your local network automatically via SSDP. This works if you have exactly one device. If you have multiple devices or discovery fails, you can manually configure the Push URL in the `.env` file.
 
 <img width="216" height="480" alt="Screenshot of My Data DIY LaMetric Time app configuration" src="https://github.com/user-attachments/assets/25f1e4f3-ad1a-48f8-a646-132e96c5a7ab" />
 
@@ -66,8 +68,10 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 ```
 
 **Required for all sources:**
-- `LAMETRIC_URL`: Your LaMetric Push URL (from the My Data DIY app)
-- `LAMETRIC_API_KEY`: Your LaMetric API key
+- `LAMETRIC_API_KEY`: We cannot work with your display without its special code.
+
+**Optional (auto-discovery recommended):**
+- `LAMETRIC_URL`: Your LaMetric Push URL - Leave empty to use auto-discovery. Only configure this manually if you have multiple LaMetric devices or auto-discovery fails.
 
 **Source-specific configuration:**
 - **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
@@ -75,6 +79,9 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 - **HomeWizard v2:** Set `HOMEWIZARD_HOST` and `HOMEWIZARD_TOKEN` (requires firmware >= 6.0 and manual token creation)
 
 You will need the local IP address of your HomeWizard device if using that source. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
+
+**About auto-discovery:**
+The bridge automatically discovers your LaMetric Time device using SSDP (Simple Service Discovery Protocol). If exactly one device is found on your network, it will be used automatically. If zero or multiple devices are found, you must configure `LAMETRIC_URL` manually. The bridge also handles DHCP lease renewals gracefully by re-discovering the device when the IP changes.
 
 ### 3. Run manually
 
