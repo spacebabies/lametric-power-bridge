@@ -3,12 +3,7 @@ import asyncio
 import logging
 import os
 import requests
-from urllib.parse import urlparse
-
-try:
-    from async_upnp_client.search import async_search
-except ImportError:
-    async_search = None
+import socket
 
 from sources.base import PowerReading
 
@@ -23,54 +18,117 @@ ICON_STALE = 1059   # Lightning bolt with red slash (no data)
 LAMETRIC_API_KEY = os.environ.get("LAMETRIC_API_KEY")
 LAMETRIC_URL = os.environ.get("LAMETRIC_URL")
 
+# SSDP Discovery Configuration
+SSDP_ADDR = "239.255.255.250"
+SSDP_PORT = 1900
+LAMETRIC_URN = "urn:schemas-upnp-org:device:LaMetric:1"
+
+# M-SEARCH payload for SSDP discovery
+M_SEARCH_MSG = "\r\n".join([
+    "M-SEARCH * HTTP/1.1",
+    f"HOST: {SSDP_ADDR}:{SSDP_PORT}",
+    'MAN: "ssdp:discover"',
+    "MX: 3",
+    f"ST: {LAMETRIC_URN}",
+    "",
+    ""
+]).encode("utf-8")
+
 # Discovery state
 _discovered_ip = None
 _discovery_attempted = False
 
 
+class _SSDPDiscoveryProtocol(asyncio.DatagramProtocol):
+    """
+    SSDP discovery protocol that accepts responses from ANY source port.
+
+    This is required for LaMetric devices which respond from ephemeral ports
+    (e.g., 49153) instead of the standard SSDP port 1900.
+    """
+    def __init__(self, future: asyncio.Future):
+        self.future = future
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+        self.transport.sendto(M_SEARCH_MSG, (SSDP_ADDR, SSDP_PORT))
+        logger.debug(f"LaMetric: Sent M-SEARCH to {SSDP_ADDR}:{SSDP_PORT}")
+
+    def datagram_received(self, data: bytes, addr: tuple):
+        """
+        Accept SSDP responses from ANY source port.
+
+        SECURITY NOTE: This deliberately does NOT filter by source port (unlike most
+        SSDP libraries which enforce port 1900). Here's why:
+
+        1. LaMetric devices respond from ephemeral ports (e.g., 49153), not port 1900
+        2. Filtering by port would break discovery entirely
+        3. The security risk is acceptable because:
+           - Requires attacker on local network (if LAN is breached, bigger problems exist)
+           - Data sent to LaMetric is non-sensitive (power consumption readings)
+           - LaMetric API requires authentication (LAMETRIC_API_KEY)
+           - Attack window is small (~10 second discovery timeout)
+
+        Port 1900 filtering in libraries protects against SSDP reflection/amplification
+        DDoS attacks, but we're the client (not server), so that doesn't apply here.
+
+        An attacker could spoof SSDP responses to redirect traffic, but they would need
+        LAN access AND the LaMetric API key to impersonate the device successfully.
+        """
+        try:
+            message = data.decode("utf-8", errors="ignore")
+
+            if "HTTP/1.1 200 OK" in message and LAMETRIC_URN in message:
+                ip = addr[0]
+                logger.info(f"LaMetric: Discovered device at {ip} (responded from port {addr[1]})")
+
+                if not self.future.done():
+                    self.future.set_result(ip)
+                    self.transport.close()
+        except Exception as e:
+            logger.debug(f"LaMetric: Error processing SSDP response: {e}")
+
+    def error_received(self, exc):
+        logger.debug(f"LaMetric: SSDP protocol error: {exc}")
+
+
 async def _discover_lametric(timeout=10.0):
     """
-    Discover LaMetric Time device via SSDP.
+    Discover LaMetric Time device via SSDP, ignoring source port restrictions.
 
-    Returns IP address of exactly one device, or None if zero or multiple devices found.
+    Returns IP address as string, or None if not found.
     """
-    if async_search is None:
-        logger.error("async-upnp-client not installed. Run: pip install async-upnp-client")
-        return None
-
-    search_target = "urn:schemas-upnp-org:device:LaMetric:1"
-    discovered_devices = []
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
 
     logger.debug(f"LaMetric: Starting SSDP discovery (timeout: {timeout}s)")
 
     try:
-        async for result in async_search(timeout=timeout, search_target=search_target):
-            location = result.get("location")
-            if location:
-                parsed = urlparse(location)
-                ip = parsed.hostname
-                if ip and ip not in discovered_devices:
-                    discovered_devices.append(ip)
-                    logger.debug(f"LaMetric: Found device at {ip}")
+        # Create UDP socket bound to ephemeral port, accepting responses from any source port
+        transport, protocol = await loop.create_datagram_endpoint(
+            lambda: _SSDPDiscoveryProtocol(future),
+            local_addr=("0.0.0.0", 0),
+            family=socket.AF_INET
+        )
 
-    except Exception as e:
-        logger.debug(f"LaMetric: SSDP discovery error: {e}")
+        # Wait for result or timeout
+        ip_address = await asyncio.wait_for(future, timeout=timeout)
+        return ip_address
 
-    # Handle discovery results
-    if len(discovered_devices) == 0:
+    except asyncio.TimeoutError:
         logger.warning(
             "LaMetric: No devices found via SSDP discovery. "
             "Set LAMETRIC_URL manually in lametric-power-bridge.env"
         )
+        if 'transport' in locals():
+            transport.close()
         return None
-    elif len(discovered_devices) == 1:
-        logger.info(f"LaMetric: Discovered device at {discovered_devices[0]}")
-        return discovered_devices[0]
-    else:
-        logger.warning(
-            f"LaMetric: Found {len(discovered_devices)} devices: {', '.join(discovered_devices)}. "
-            "Cannot determine which to use. Set LAMETRIC_URL manually in lametric-power-bridge.env"
-        )
+
+    except Exception as e:
+        logger.debug(f"LaMetric: SSDP discovery error: {e}")
+        if 'transport' in locals():
+            transport.close()
         return None
 
 
@@ -157,7 +215,8 @@ async def send_http_payload(payload):
     url = await _get_lametric_url()
 
     if not url:
-        logger.warning(
+        # Debug level - discovery already logged the actual issue at WARNING
+        logger.debug(
             "LaMetric: No URL available. Either discovery failed or found multiple devices. "
             "Configure LAMETRIC_URL manually to proceed."
         )

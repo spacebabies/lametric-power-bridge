@@ -703,6 +703,7 @@ checking if dinner is ready."
 
 ## Changelog
 
+- **2026-01-02**: SSDP auto-discovery gefixt - replaced `async-upnp-client` met custom `asyncio.DatagramProtocol` (library filterde responses van non-standard ports, LaMetric gebruikt port 49153 ipv 1900, security tradeoff gedocumenteerd)
 - **2026-01-01**: LaMetric Time SSDP auto-discovery toegevoegd (LAMETRIC_URL nu optioneel, handles DHCP lease renewals, 12 LaMetric tests total)
 - **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)
 - **2025-12-28**: HomeWizard P1 v1 API toegevoegd (`--source=homewizard-v1`, HTTP polling, 18 tests total)
