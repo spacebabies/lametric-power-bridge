@@ -76,14 +76,18 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 
 **Source-specific configuration:**
 - **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
-- **HomeWizard v1:** Set `HOMEWIZARD_HOST` (local IP address of your device)
-- **HomeWizard v2:** Set `HOMEWIZARD_HOST` and `HOMEWIZARD_TOKEN` (requires firmware >= 6.0 and manual token creation)
+- **HomeWizard v1:** `HOMEWIZARD_HOST` is optional (auto-discovery used if empty)
+- **HomeWizard v2:** Set `HOMEWIZARD_TOKEN` (required) and optionally `HOMEWIZARD_HOST`
 - **P1 Serial:** Optionally set `P1_SERIAL_DEVICE` (defaults to `/dev/ttyUSB0`) and `P1_SERIAL_BAUDRATE` (defaults to `115200` for DSMR v4+, use `9600` if your meter predates the invention of high-speed serial communication)
 
-You will need the local IP address of your HomeWizard device if using that source. This can typically be found in your router's DHCP table, or by asking the HomeWizard Energy app politely.
+You will need the local IP address of your HomeWizard device ONLY if auto-discovery fails or you have multiple devices. Otherwise, enjoy the magic of mDNS.
 
 **About auto-discovery:**
-The bridge automatically discovers your LaMetric Time device using SSDP (Simple Service Discovery Protocol). If exactly one device is found on your network, it will be used automatically. If zero or multiple devices are found, you must configure `LAMETRIC_URL` manually. The bridge also handles DHCP lease renewals gracefully by re-discovering the device when the IP changes.
+The bridge supports auto-discovery for both LaMetric and HomeWizard devices:
+- **LaMetric:** Discovered via SSDP (Simple Service Discovery Protocol). If exactly one device is found, it updates your push URL automatically.
+- **HomeWizard:** Discovered via mDNS (Multicast DNS). If `HOMEWIZARD_HOST` is left empty, the bridge will find your "HWE-P1" meter automatically.
+
+This ensures that even if your router decides to assign new IP addresses (DHCP renewal), the bridge will re-discover the devices and continue functioning without intervention.
 
 ### 3. Run manually
 
