@@ -162,7 +162,7 @@ class LaMetricURLManager:
         if not base_url:
             raise ValueError(
                 "LAMETRIC_URL is required in lametric-power-bridge.env. "
-                "Get the full widget URL from https://developer.lametric.com/applications"
+                "Get the full widget URL from the LaMetric Time mobile app"
             )
 
         self.base_url = base_url
@@ -266,7 +266,7 @@ def _get_url_manager() -> LaMetricURLManager:
         if not LAMETRIC_URL:
             raise ValueError(
                 "LAMETRIC_URL is required in lametric-power-bridge.env. "
-                "Get the full widget URL from https://developer.lametric.com/applications"
+                "Get the full widget URL from the LaMetric Time mobile app"
             )
         _url_manager = LaMetricURLManager(LAMETRIC_URL)
 
