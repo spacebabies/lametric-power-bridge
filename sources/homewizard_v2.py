@@ -12,6 +12,7 @@ except ImportError:
     websockets = None
 
 from sources.base import PowerReading
+from sources.discovery_mdns import discover_homewizard_p1
 
 logger = logging.getLogger(__name__)
 
@@ -28,24 +29,24 @@ class HomeWizardV2Source:
 
     def __init__(
         self,
-        host: str,
-        token: str
+        token: str,
+        host: str | None = None
     ):
         """
         Initialize HomeWizard v2 source.
 
         Args:
-            host: IP address or hostname of the device (e.g., "192.168.2.87")
             token: Local user authentication token
+            host: IP address or hostname (optional, auto-discovered if None)
         """
         if websockets is None:
             logger.error("websockets library not installed. Run: pip install websockets")
             sys.exit(1)
 
         self.host = host
+        self.auto_discovery = host is None
         self.token = token
-        # v2 API uses WSS (WebSocket Secure) on port 443
-        self.ws_url = f"wss://{host}/api/ws"
+        self.ws_url = None # Set in connect()
 
         # Create SSL context that ignores cert verification
         # (HomeWizard uses self-signed certs with non-standard hostnames)
@@ -69,14 +70,27 @@ class HomeWizardV2Source:
         For v2 API, the WebSocket itself handles all bootstrapping.
         This method validates configuration before attempting connection.
         """
-        if not self.host:
-            logger.error("HOMEWIZARD_HOST not configured")
-            sys.exit(1)
-
         if not self.token:
             logger.error("HOMEWIZARD_TOKEN not configured")
             sys.exit(1)
 
+        # Auto-discovery if needed
+        if self.host is None and self.auto_discovery:
+            logger.info("HomeWizard v2: Auto-discovering device via mDNS...")
+            discovered_ip = discover_homewizard_p1()
+            if discovered_ip:
+                self.host = discovered_ip
+                logger.info(f"HomeWizard v2: Discovered device at {self.host}")
+            else:
+                logger.error("HomeWizard v2: Discovery failed. Ensure device is powered and on network.")
+                sys.exit(1)
+                return
+
+        if not self.host:
+            logger.error("HOMEWIZARD_HOST not configured and discovery failed")
+            sys.exit(1)
+
+        self.ws_url = f"wss://{self.host}/api/ws"
         logger.info(f"HomeWizard v2: Prepared WebSocket connection to {self.ws_url}")
 
     async def stream(self) -> AsyncIterator[PowerReading]:
@@ -181,6 +195,15 @@ class HomeWizardV2Source:
 
             except websockets.ConnectionClosed as e:
                 logger.warning(f"HomeWizard v2: Connection closed: {e}. Reconnecting in 5s...")
+                
+                # Try to re-discover if IP changed
+                if self.auto_discovery:
+                    new_ip = discover_homewizard_p1(timeout=5.0)
+                    if new_ip and new_ip != self.host:
+                         logger.info(f"HomeWizard v2: Device IP changed: {self.host} -> {new_ip}")
+                         self.host = new_ip
+                         self.ws_url = f"wss://{self.host}/api/ws"
+                
                 await asyncio.sleep(5)
                 continue
             except Exception as e:
