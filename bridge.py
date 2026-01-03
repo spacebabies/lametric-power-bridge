@@ -39,20 +39,22 @@ def get_source(source_name: str):
     elif source_name == "homewizard-v1":
         host = os.getenv("HOMEWIZARD_HOST")
         if not host:
-            logger.error("HomeWizard v1: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
-            sys.exit(1)
-        logger.info(f"Using source: HomeWizard v1 API (HTTP polling)")
+            logger.info("HomeWizard v1: HOMEWIZARD_HOST not configured, using mDNS auto-discovery")
+        else:
+            logger.info(f"Using source: HomeWizard v1 API (HTTP polling) at {host}")
         return HomeWizardV1Source(host=host)
     elif source_name == "homewizard-v2":
         host = os.getenv("HOMEWIZARD_HOST")
         token = os.getenv("HOMEWIZARD_TOKEN")
-        if not host:
-            logger.error("HomeWizard v2: HOMEWIZARD_HOST not configured in lametric-power-bridge.env")
-            sys.exit(1)
         if not token:
             logger.error("HomeWizard v2: HOMEWIZARD_TOKEN not configured in lametric-power-bridge.env")
             sys.exit(1)
-        logger.info(f"Using source: HomeWizard v2 API (WebSocket)")
+            
+        if not host:
+            logger.info("HomeWizard v2: HOMEWIZARD_HOST not configured, using mDNS auto-discovery")
+        else:
+            logger.info(f"Using source: HomeWizard v2 API (WebSocket) at {host}")
+            
         return HomeWizardV2Source(host=host, token=token)
     elif source_name == "p1-serial":
         device = os.getenv("P1_SERIAL_DEVICE", "/dev/ttyUSB0")
