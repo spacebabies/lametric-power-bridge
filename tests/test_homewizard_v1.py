@@ -33,14 +33,51 @@ async def test_homewizard_connect_success(mocker):
 
 
 @pytest.mark.asyncio
-async def test_homewizard_connect_no_host_exits(mocker):
-    """Test that connect exits when HOMEWIZARD_HOST is empty"""
-    mock_exit = mocker.patch('sources.homewizard_v1.sys.exit')
+async def test_homewizard_connect_no_host_triggers_discovery(mocker):
+    """Test that connect triggers discovery when host is empty"""
+    # Mock discovery
+    mock_discover = mocker.patch(
+        'sources.homewizard_v1.discover_homewizard_p1',
+        return_value="192.168.2.99"
+    )
 
-    source = HomeWizardV1Source(host="")
+    # Initialize with no host
+    source = HomeWizardV1Source(host=None)
+    
+    # Mock client creation to avoid actual network calls
+    mocker.patch('sources.homewizard_v1.httpx.AsyncClient')
+    mock_client = mocker.AsyncMock()
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"active_power_w": 100}
+    mock_response.raise_for_status = mocker.Mock()
+    mock_client.get.return_value = mock_response
+    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+
     await source.connect()
 
-    # Verify sys.exit was called when host is empty
+    # Verify discovery was called
+    mock_discover.assert_called_once()
+    
+    # Verify host was set
+    assert source.host == "192.168.2.99"
+    assert source.base_url == "http://192.168.2.99/api/v1/data"
+
+
+@pytest.mark.asyncio
+async def test_homewizard_connect_discovery_failure_exits(mocker):
+    """Test that connect exits when discovery fails"""
+    # Mock discovery failure (returns None)
+    mocker.patch(
+        'sources.homewizard_v1.discover_homewizard_p1',
+        return_value=None
+    )
+    
+    mock_exit = mocker.patch('sources.homewizard_v1.sys.exit')
+
+    source = HomeWizardV1Source(host=None)
+    await source.connect()
+
+    # Verify sys.exit was called
     mock_exit.assert_called_once_with(1)
 
 
