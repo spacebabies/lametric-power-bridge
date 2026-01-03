@@ -333,3 +333,53 @@ async def test_discovery_only_runs_once(mocker):
     url_manager = lametric_module._url_manager
     assert url_manager.discovered_ip == "192.168.1.100"
     assert url_manager.discovery_attempted == True
+
+
+# URL Construction Tests (the SINGLE place where URLs are built)
+
+def test_replace_host_standard_url():
+    """Test _replace_host() with standard widget URL"""
+    original = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    new_ip = "192.168.2.10"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "http://192.168.2.10:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+
+
+def test_replace_host_no_port():
+    """Test _replace_host() defaults to port 8080 when not specified"""
+    original = "http://192.168.2.2/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    new_ip = "10.0.0.5"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "http://10.0.0.5:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+
+
+def test_replace_host_custom_port():
+    """Test _replace_host() preserves custom ports"""
+    original = "http://192.168.2.2:9999/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    new_ip = "172.16.0.1"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "http://172.16.0.1:9999/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+
+
+def test_replace_host_with_query_params():
+    """Test _replace_host() preserves query parameters"""
+    original = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123?param=value"
+    new_ip = "192.168.2.7"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "http://192.168.2.7:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123?param=value"
+
+
+def test_replace_host_preserves_scheme():
+    """Test _replace_host() preserves HTTPS scheme"""
+    original = "https://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    new_ip = "192.168.2.7"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "https://192.168.2.7:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+
+
+def test_replace_host_long_secret():
+    """Test _replace_host() preserves long widget secrets"""
+    original = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/f3b7537fe7a3460db469a9722af3e6a8"
+    new_ip = "192.168.2.7"
+    result = lametric_module.LaMetricURLManager._replace_host(original, new_ip)
+    assert result == "http://192.168.2.7:8080/api/v2/widget/update/com.lametric.diy.devwidget/f3b7537fe7a3460db469a9722af3e6a8"
