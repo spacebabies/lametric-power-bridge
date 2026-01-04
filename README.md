@@ -42,9 +42,8 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 2.  Click the `+` sign (Market).
 3.  Add **My Data DIY**, published by LaMetric.
 4.  Give it a name and choose **HTTP Push**.
+5.  Grab the **HTTP Push URL** from the app config.
 5.  Grab the **API Key** from the [developer portal](https://developer.lametric.com/user/devices). (2022 models or later also show this in the app)
-
-The bridge will discover your LaMetric Time device on your local network automatically via SSDP. This works if you have exactly one device. If you have multiple devices or discovery fails, you can manually configure the Push URL in the `.env` file.
 
 <img width="216" height="480" alt="Screenshot of My Data DIY LaMetric Time app configuration" src="https://github.com/user-attachments/assets/25f1e4f3-ad1a-48f8-a646-132e96c5a7ab" />
 
@@ -69,18 +68,14 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 ```
 
 **Required for all sources:**
-- `LAMETRIC_API_KEY`: We cannot work with your display without its special code.
-
-**Optional (auto-discovery recommended):**
-- `LAMETRIC_URL`: Your LaMetric Push URL - Leave empty to use auto-discovery. Only configure this manually if you have multiple LaMetric devices or auto-discovery fails.
+- `LAMETRIC_URL`: Your LaMetric Push URL. We need a location to send verbiage to.
+- `LAMETRIC_API_KEY`: We cannot work with your display without its secret access code.
 
 **Source-specific configuration:**
 - **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
 - **HomeWizard v1:** `HOMEWIZARD_HOST` is optional (auto-discovery used if empty)
 - **HomeWizard v2:** Set `HOMEWIZARD_TOKEN` (required) and optionally `HOMEWIZARD_HOST`
 - **P1 Serial:** Optionally set `P1_SERIAL_DEVICE` (defaults to `/dev/ttyUSB0`) and `P1_SERIAL_BAUDRATE` (defaults to `115200` for DSMR v4+, use `9600` if your meter predates the invention of high-speed serial communication)
-
-You will need the local IP address of your HomeWizard device ONLY if auto-discovery fails or you have multiple devices. Otherwise, enjoy the magic of mDNS.
 
 **About auto-discovery:**
 The bridge supports auto-discovery for both LaMetric and HomeWizard devices:
@@ -204,13 +199,10 @@ To ensure the bridge runs 24/7 and restarts when the inevitable entropy of the u
 - [x] HomeWizard v1 API Backend (HTTP Polling) — _For those who trust Wi-Fi but distrust cloud services_
 - [x] HomeWizard v2 API Backend (WebSocket) — _Same device, slightly fancier protocol, requires recent firmware and a token ritual_
 - [x] DSMR P1 Serial Backend — _For those who prefer wires, possess USB ports, and appreciate the purity of electrons over copper_
-- [ ] Multi-frame support (e.g., Gas usage, or perhaps the current price of tea)
 
 ## Acknowledgments
 
-Built with the **[HomeWizard Energy](https://www.homewizard.com/)** local API. Special thanks to the HomeWizard team for providing a well-documented local API that respects user privacy and enables creative integrations like this one.
-
-**Developer Note**: Implementation patterns inspired by HomeWizard's excellent **[python-homewizard-energy](https://github.com/homewizard/python-homewizard-energy)** library, particularly the async context manager pattern and API versioning approach. If you're building HomeWizard integrations in Python, I highly recommend checking out their official library.
+Special thanks to the HomeWizard team for providing a well-documented local [Python client](https://github.com/homewizard/python-homewizard-energy) that respects user privacy and enables creative integrations like this one.
 
 ## License
 
