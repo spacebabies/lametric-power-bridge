@@ -73,7 +73,7 @@ class HomeWizardV1Source:
         # Auto-discovery if needed
         if self.host is None and self.auto_discovery:
             logger.info("HomeWizard v1: Auto-discovering device via mDNS...")
-            discovered_ip = discover_homewizard_p1()
+            discovered_ip = await discover_homewizard_p1()
             if discovered_ip:
                 self.host = discovered_ip
                 logger.info(f"HomeWizard v1: Discovered device at {self.host}")
@@ -211,7 +211,7 @@ class HomeWizardV1Source:
                 # If using auto-discovery, try to find new IP immediately on connection loss
                 if self.auto_discovery and consecutive_errors >= 2:
                      logger.warning("HomeWizard v1: Connection lost. Attempting re-discovery...")
-                     new_ip = discover_homewizard_p1(timeout=5.0)
+                     new_ip = await discover_homewizard_p1(timeout=5.0)
                      if new_ip and new_ip != self.host:
                          logger.info(f"HomeWizard v1: Device IP changed: {self.host} -> {new_ip}")
                          self.host = new_ip
