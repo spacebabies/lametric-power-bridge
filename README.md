@@ -82,7 +82,9 @@ The bridge supports auto-discovery for both LaMetric and HomeWizard devices:
 - **LaMetric:** Discovered via SSDP (Simple Service Discovery Protocol). If exactly one device is found, it updates your push URL automatically.
 - **HomeWizard:** Discovered via mDNS (Multicast DNS). If `HOMEWIZARD_HOST` is left empty, the bridge will find your "HWE-P1" meter automatically.
 
-This ensures that even if your router decides to assign new IP addresses (DHCP renewal), the bridge will re-discover the devices and continue functioning without intervention.
+This ensures that even if your router decides to assign new IP addresses (DHCP renewal), the bridge will re-discover the devices and continue functioning without intervention. _However..._
+
+If you can, it wouldn't be a terrible idea go into your router's config and assign a fixed IP to especially the LaMetric. The one I have tends to exhibit a broken state from time to time where e.g. the clock face still works, but SSDP became broken somehow. If discovery doesn't work on your network, try [turning your devices off and on again](https://www.youtube.com/watch?v=DPqdyoTpyEs). It does fix things sometimes.
 
 ### 3. Run manually
 
