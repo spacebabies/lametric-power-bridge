@@ -700,6 +700,7 @@ checking if dinner is ready."
 
 ## Changelog
 
+- **2026-01-05**: Release v1.0.0 (First official release)
 - **2026-01-02**: SSDP auto-discovery fixed - replaced `async-upnp-client` with custom `asyncio.DatagramProtocol` (library filtered responses from non-standard ports, LaMetric uses port 49153 instead of 1900, security tradeoff documented)
 - **2026-01-01**: LaMetric Time SSDP auto-discovery added (LAMETRIC_URL now optional, handles DHCP lease renewals, 12 LaMetric tests total)
 - **2025-12-28**: Consolidated .env files - all config in `lametric-power-bridge.env` (learning: separate files was over-engineering)

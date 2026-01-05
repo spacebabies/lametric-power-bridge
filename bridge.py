@@ -7,6 +7,8 @@ import time
 
 from dotenv import load_dotenv
 
+__version__ = "1.0.0"
+
 # Load configuration from single .env file
 load_dotenv("lametric-power-bridge.env")
 
@@ -124,6 +126,11 @@ if __name__ == "__main__":
         default="tibber",
         choices=["tibber", "homewizard-v1", "homewizard-v2", "p1-serial"],
         help="Power source to use (default: tibber)"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}"
     )
     args = parser.parse_args()
 
