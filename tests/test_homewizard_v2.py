@@ -19,14 +19,37 @@ async def test_homewizard_v2_connect_success():
 
 
 @pytest.mark.asyncio
-async def test_homewizard_v2_connect_no_host_exits(mocker):
-    """Test that connect exits when HOMEWIZARD_HOST is empty"""
-    mock_exit = mocker.patch('sources.homewizard_v2.sys.exit')
+async def test_homewizard_v2_connect_no_host_triggers_discovery(mocker):
+    """Test that connect triggers discovery when host is empty"""
+    # Mock discovery
+    mock_discover = mocker.patch(
+        'sources.homewizard_v2.discover_homewizard_p1',
+        return_value="192.168.2.99"
+    )
 
-    source = HomeWizardV2Source(host="", token="test-token")
+    source = HomeWizardV2Source(host=None, token="test-token")
     await source.connect()
 
-    # Verify sys.exit was called when host is empty
+    # Verify discovery was called
+    mock_discover.assert_called_once()
+    
+    # Verify host was set
+    assert source.host == "192.168.2.99"
+    assert source.ws_url == "wss://192.168.2.99/api/ws"
+
+
+@pytest.mark.asyncio
+async def test_homewizard_v2_connect_discovery_failure_exits(mocker):
+    """Test that connect exits when discovery fails"""
+    mocker.patch(
+        'sources.homewizard_v2.discover_homewizard_p1',
+        return_value=None
+    )
+    mock_exit = mocker.patch('sources.homewizard_v2.sys.exit')
+
+    source = HomeWizardV2Source(host=None, token="test-token")
+    await source.connect()
+
     mock_exit.assert_called_once_with(1)
 
 

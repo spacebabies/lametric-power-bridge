@@ -10,6 +10,7 @@ except ImportError:
     httpx = None
 
 from sources.base import PowerReading
+from sources.discovery_mdns import discover_homewizard_p1
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class HomeWizardV1Source:
 
     def __init__(
         self,
-        host: str,
+        host: str | None = None,
         poll_interval: float = 1.0,
         timeout: float = 5.0,
         max_retries: int = 3
@@ -36,7 +37,7 @@ class HomeWizardV1Source:
         Initialize HomeWizard v1 source.
 
         Args:
-            host: IP address or hostname of the device (e.g., "192.168.2.87")
+            host: IP address or hostname (optional, auto-discovered if None)
             poll_interval: Seconds between polls (default: 1.0)
             timeout: HTTP request timeout in seconds (default: 5.0)
             max_retries: Maximum consecutive retries on errors (default: 3)
@@ -46,10 +47,11 @@ class HomeWizardV1Source:
             sys.exit(1)
 
         self.host = host
+        self.auto_discovery = host is None
         self.poll_interval = poll_interval
         self.timeout = timeout
         self.max_retries = max_retries
-        self.base_url = f"http://{host}/api/v1/data"
+        self.base_url = None  # Set in connect()
         self.client = None
 
     async def __aenter__(self):
@@ -68,10 +70,24 @@ class HomeWizardV1Source:
         Phase 1: HTTP Bootstrap.
         Validates connectivity to the device and creates persistent client.
         """
+        # Auto-discovery if needed
+        if self.host is None and self.auto_discovery:
+            logger.info("HomeWizard v1: Auto-discovering device via mDNS...")
+            discovered_ip = discover_homewizard_p1()
+            if discovered_ip:
+                self.host = discovered_ip
+                logger.info(f"HomeWizard v1: Discovered device at {self.host}")
+            else:
+                logger.error("HomeWizard v1: Discovery failed. Ensure device is powered and on network.")
+                sys.exit(1)
+                return
+
         if not self.host:
-            logger.error("HOMEWIZARD_HOST not configured")
+            logger.error("HOMEWIZARD_HOST not configured and discovery failed")
             sys.exit(1)
             return  # For test mocking: prevent further execution
+
+        self.base_url = f"http://{self.host}/api/v1/data"
 
         # Create persistent HTTP client with keep-alive
         self.client = httpx.AsyncClient(
@@ -191,6 +207,18 @@ class HomeWizardV1Source:
 
             except httpx.ConnectError:
                 consecutive_errors += 1
+                
+                # If using auto-discovery, try to find new IP immediately on connection loss
+                if self.auto_discovery and consecutive_errors >= 2:
+                     logger.warning("HomeWizard v1: Connection lost. Attempting re-discovery...")
+                     new_ip = discover_homewizard_p1(timeout=5.0)
+                     if new_ip and new_ip != self.host:
+                         logger.info(f"HomeWizard v1: Device IP changed: {self.host} -> {new_ip}")
+                         self.host = new_ip
+                         self.base_url = f"http://{self.host}/api/v1/data"
+                         consecutive_errors = 0  # Reset errors since we have a new target
+                         continue
+
                 if consecutive_errors >= self.max_retries:
                     logger.error(
                         f"HomeWizard v1: Max retries ({self.max_retries}) exceeded. "
