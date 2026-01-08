@@ -52,8 +52,24 @@ class _SSDPDiscoveryProtocol(asyncio.DatagramProtocol):
 
     def connection_made(self, transport):
         self.transport = transport
+        # Send first packet immediately
         self.transport.sendto(M_SEARCH_MSG, (SSDP_ADDR, SSDP_PORT))
-        logger.debug(f"LaMetric: Sent M-SEARCH to {SSDP_ADDR}:{SSDP_PORT}")
+        logger.debug(f"LaMetric: Sent M-SEARCH 1/3 to {SSDP_ADDR}:{SSDP_PORT}")
+        
+        # Schedule subsequent packets to improve reliability over UDP
+        loop = asyncio.get_running_loop()
+        loop.create_task(self._send_burst())
+
+    async def _send_burst(self):
+        """Send additional discovery packets with delay"""
+        for i in range(2):
+            await asyncio.sleep(1.0)
+            if self.transport and not self.transport.is_closing():
+                try:
+                    self.transport.sendto(M_SEARCH_MSG, (SSDP_ADDR, SSDP_PORT))
+                    logger.debug(f"LaMetric: Sent M-SEARCH {i+2}/3 to {SSDP_ADDR}:{SSDP_PORT}")
+                except Exception as e:
+                    logger.debug(f"LaMetric: Error sending burst packet: {e}")
 
     def datagram_received(self, data: bytes, addr: tuple):
         """

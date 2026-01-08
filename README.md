@@ -82,9 +82,21 @@ The bridge supports auto-discovery for both LaMetric and HomeWizard devices:
 - **LaMetric:** Discovered via SSDP (Simple Service Discovery Protocol). If exactly one device is found, it updates your push URL automatically.
 - **HomeWizard:** Discovered via mDNS (Multicast DNS). If `HOMEWIZARD_HOST` is left empty, the bridge will find your "HWE-P1" meter automatically.
 
-This ensures that even if your router decides to assign new IP addresses (DHCP renewal), the bridge will re-discover the devices and continue functioning without intervention. _However..._
+This ensures that even if your router decides to assign new IP addresses (DHCP renewal), the bridge will re-discover the devices and continue functioning without intervention.
 
-If you can, it wouldn't be a terrible idea go into your router's config and assign a fixed IP to especially the LaMetric. The one I have tends to exhibit a broken state from time to time where e.g. the clock face still works, but SSDP became broken somehow. If discovery doesn't work on your network, try [turning your devices off and on again](https://www.youtube.com/watch?v=DPqdyoTpyEs). It does fix things sometimes.
+### ⚠️ Warning for LaMetric Time (2019-2021 Models)
+
+If you own a LaMetric Time manufactured between roughly 2019 and 2021: **Congratulations**, you own a device with a personality disorder.
+
+These units suffer from a known memory leak in their UPnP/SSDP network stack. After a few days of uptime, the part of its brain that shouts "I'm here!" at your router simply... stops. The device works fine, the API works fine, the clock ticks on, but it refuses to answer discovery requests. It goes incognito.
+
+**The Fix:**
+1.  Log into your router.
+2.  Assign a **static IP address** to your LaMetric Time.
+3.  Set `LAMETRIC_URL` manually in your `.env` file (e.g., `http://192.168.1.25:8080/...`).
+4.  Restart this service.
+
+Do not rely on auto-discovery for these units unless you enjoy restarting your clock every 48 hours.
 
 ### 3. Run manually
 
