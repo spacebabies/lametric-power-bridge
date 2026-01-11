@@ -10,7 +10,7 @@ try:
 except ImportError:
     serial = None
 
-from sources.base import PowerReading
+from .base import PowerReading
 
 logger = logging.getLogger(__name__)
 

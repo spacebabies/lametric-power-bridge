@@ -3,14 +3,14 @@ import os
 import asyncio
 import requests
 import logging
-from sources.base import PowerReading
-from sinks.lametric import push_to_lametric, push_to_lametric_stale
-import sinks.lametric as lametric_module
+from lametric_power_bridge.sources.base import PowerReading
+from lametric_power_bridge.sinks.lametric import push_to_lametric, push_to_lametric_stale
+import lametric_power_bridge.sinks.lametric as lametric_module
 
 @pytest.mark.asyncio
 async def test_push_to_lametric_import_power(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the function with importing power
     reading = PowerReading(power_watts=1500)
@@ -31,7 +31,7 @@ async def test_push_to_lametric_import_power(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_export_power(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the function with exporting power
     reading = PowerReading(power_watts=-500)
@@ -52,7 +52,7 @@ async def test_push_to_lametric_export_power(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_round_float(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the function with a float value that needs rounding
     reading = PowerReading(power_watts=180.7)
@@ -73,7 +73,7 @@ async def test_push_to_lametric_round_float(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_kilowatts(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the function with high power (kW display)
     reading = PowerReading(power_watts=10500)
@@ -94,7 +94,7 @@ async def test_push_to_lametric_kilowatts(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_export_high(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the function with high export power (negative kW)
     reading = PowerReading(power_watts=-11000)
@@ -115,7 +115,7 @@ async def test_push_to_lametric_export_high(mocker):
 @pytest.mark.asyncio
 async def test_push_to_lametric_stale(mocker):
     # Mock the send_http_payload function to avoid actual HTTP requests
-    mock_send = mocker.patch('sinks.lametric.send_http_payload')
+    mock_send = mocker.patch('lametric_power_bridge.sinks.lametric.send_http_payload')
 
     # Call the stale data function
     await push_to_lametric_stale()
@@ -142,14 +142,14 @@ async def test_initial_url_used_first(mocker):
     lametric_module._url_manager = None
 
     base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
     # Mock discovery (should NOT be called if first request succeeds)
-    mock_discover = mocker.patch('sinks.lametric._discover_lametric')
+    mock_discover = mocker.patch('lametric_power_bridge.sinks.lametric._discover_lametric')
     
     # Mock successful HTTP request
-    mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
+    mock_to_thread = mocker.patch('lametric_power_bridge.sinks.lametric.asyncio.to_thread')
 
     # Call push
     reading = PowerReading(power_watts=1500)
@@ -171,14 +171,14 @@ async def test_rediscovery_fallback_success(mocker, caplog):
     lametric_module._url_manager = None
 
     base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
     # Mock discovery returning new IP
     async def mock_discover_impl(timeout=10.0):
         return "192.168.1.100"
     
-    mocker.patch('sinks.lametric._discover_lametric', side_effect=mock_discover_impl)
+    mocker.patch('lametric_power_bridge.sinks.lametric._discover_lametric', side_effect=mock_discover_impl)
 
     # Mock asyncio.to_thread to simulate failure then success
     call_count = 0
@@ -189,7 +189,7 @@ async def test_rediscovery_fallback_success(mocker, caplog):
             raise requests.exceptions.ConnectionError("Connection refused")
         return None
 
-    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+    mocker.patch('lametric_power_bridge.sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
 
     # Call push
     reading = PowerReading(power_watts=1500)
@@ -198,7 +198,7 @@ async def test_rediscovery_fallback_success(mocker, caplog):
     # Verify two requests: 1st with base_url, 2nd with discovered IP
     assert call_count == 2
     
-    calls = mocker.patch('sinks.lametric.asyncio.to_thread').call_args_list
+    calls = mocker.patch('lametric_power_bridge.sinks.lametric.asyncio.to_thread').call_args_list
     # Note: side_effect mock replaces the object, so we can't inspect 'calls' on the original patch object easily
     # unless we captured it. But we know call_count is 2.
     
@@ -213,17 +213,17 @@ async def test_rediscovery_fallback_not_found(mocker, caplog):
     lametric_module._url_manager = None
 
     base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
     # Mock discovery returning None
-    mocker.patch('sinks.lametric._discover_lametric', return_value=None)
+    mocker.patch('lametric_power_bridge.sinks.lametric._discover_lametric', return_value=None)
 
     # Mock asyncio.to_thread to simulate failure
     async def mock_to_thread(func, *args, **kwargs):
         raise requests.exceptions.ConnectionError("Connection refused")
 
-    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+    mocker.patch('lametric_power_bridge.sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
 
     # Call push
     reading = PowerReading(power_watts=1500)
@@ -243,14 +243,14 @@ async def test_ip_cached_after_rediscovery(mocker):
     lametric_module._url_manager = None
 
     base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('lametric_power_bridge.sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
     # 1. First call fails -> Discovery success -> Retry success
     # 2. Second call -> Uses discovered IP immediately
     
     # Mock discovery
-    mock_discover = mocker.patch('sinks.lametric._discover_lametric', return_value="192.168.1.100")
+    mock_discover = mocker.patch('lametric_power_bridge.sinks.lametric._discover_lametric', return_value="192.168.1.100")
     
     call_count = 0
     url_history = []
@@ -266,7 +266,7 @@ async def test_ip_cached_after_rediscovery(mocker):
         # Succeed all others
         return None
 
-    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+    mocker.patch('lametric_power_bridge.sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
 
     # First push
     await push_to_lametric(PowerReading(power_watts=1500))

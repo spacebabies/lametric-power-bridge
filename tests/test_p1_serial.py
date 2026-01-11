@@ -1,6 +1,6 @@
 import pytest
-from sources.p1_serial import P1SerialSource
-from sources.base import PowerReading
+from lametric_power_bridge.sources.p1_serial import P1SerialSource
+from lametric_power_bridge.sources.base import PowerReading
 
 
 # Sample DSMR v4 telegram (simplified)
@@ -72,7 +72,7 @@ async def test_p1_connect_success(mocker):
     # Mock serial.Serial
     mock_serial = mocker.Mock()
     mock_serial.is_open = True
-    mocker.patch('sources.p1_serial.serial.Serial', return_value=mock_serial)
+    mocker.patch('lametric_power_bridge.sources.p1_serial.serial.Serial', return_value=mock_serial)
 
     # Mock _read_telegram to return a valid telegram
     mocker.patch.object(source, '_read_telegram', return_value=SAMPLE_TELEGRAM)
@@ -87,7 +87,7 @@ async def test_p1_connect_success(mocker):
 @pytest.mark.asyncio
 async def test_p1_connect_no_device_exits(mocker):
     """Test that connect exits when P1_SERIAL_DEVICE is empty"""
-    mock_exit = mocker.patch('sources.p1_serial.sys.exit')
+    mock_exit = mocker.patch('lametric_power_bridge.sources.p1_serial.sys.exit')
 
     source = P1SerialSource(device="")
     await source.connect()
@@ -103,8 +103,8 @@ async def test_p1_connect_serial_error_exits(mocker):
 
     # Mock serial.Serial to raise SerialException
     import serial
-    mocker.patch('sources.p1_serial.serial.Serial', side_effect=serial.SerialException("Port not found"))
-    mock_exit = mocker.patch('sources.p1_serial.sys.exit')
+    mocker.patch('lametric_power_bridge.sources.p1_serial.serial.Serial', side_effect=serial.SerialException("Port not found"))
+    mock_exit = mocker.patch('lametric_power_bridge.sources.p1_serial.sys.exit')
 
     await source.connect()
 
@@ -166,7 +166,7 @@ async def test_p1_stream_handles_read_errors(mocker):
     )
 
     # Mock asyncio.sleep to avoid delays
-    mocker.patch('sources.p1_serial.asyncio.sleep')
+    mocker.patch('lametric_power_bridge.sources.p1_serial.asyncio.sleep')
 
     # Collect one reading
     readings = []
@@ -239,10 +239,10 @@ async def test_p1_context_manager(mocker):
     # Mock serial.Serial
     mock_serial = mocker.Mock()
     mock_serial.is_open = True
-    mocker.patch('sources.p1_serial.serial.Serial', return_value=mock_serial)
+    mocker.patch('lametric_power_bridge.sources.p1_serial.serial.Serial', return_value=mock_serial)
 
     # Mock _read_telegram for connect() test
-    mock_read = mocker.patch('sources.p1_serial.P1SerialSource._read_telegram', return_value=SAMPLE_TELEGRAM)
+    mock_read = mocker.patch('lametric_power_bridge.sources.p1_serial.P1SerialSource._read_telegram', return_value=SAMPLE_TELEGRAM)
 
     # Use context manager pattern
     async with P1SerialSource(device="/dev/ttyUSB0") as source:

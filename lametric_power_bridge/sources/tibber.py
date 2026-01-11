@@ -7,7 +7,7 @@ import requests
 import websockets
 from typing import AsyncIterator
 
-from sources.base import PowerReading
+from .base import PowerReading
 
 logger = logging.getLogger(__name__)
 

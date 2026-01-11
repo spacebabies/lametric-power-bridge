@@ -1,6 +1,6 @@
 import pytest
-from sources.tibber import TibberSource
-from sources.base import PowerReading
+from lametric_power_bridge.sources.tibber import TibberSource
+from lametric_power_bridge.sources.base import PowerReading
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_tibber_connect_success(mocker):
             }
         }
     }
-    mock_post = mocker.patch('sources.tibber.requests.post', return_value=mock_response)
+    mock_post = mocker.patch('lametric_power_bridge.sources.tibber.requests.post', return_value=mock_response)
 
     # Create source and connect
     source = TibberSource(token='test-token')
@@ -61,8 +61,8 @@ async def test_tibber_connect_no_pulse_exits(mocker):
             }
         }
     }
-    mocker.patch('sources.tibber.requests.post', return_value=mock_response)
-    mock_exit = mocker.patch('sources.tibber.sys.exit')
+    mocker.patch('lametric_power_bridge.sources.tibber.requests.post', return_value=mock_response)
+    mock_exit = mocker.patch('lametric_power_bridge.sources.tibber.sys.exit')
 
     source = TibberSource(token='test-token')
     await source.connect()
@@ -113,7 +113,7 @@ async def test_tibber_stream_yields_power_readings(mocker):
     async def mock_connect(*args, **kwargs):
         yield mock_ws
 
-    mocker.patch('sources.tibber.websockets.connect', side_effect=mock_connect)
+    mocker.patch('lametric_power_bridge.sources.tibber.websockets.connect', side_effect=mock_connect)
 
     # Collect readings from stream
     readings = []

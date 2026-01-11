@@ -5,9 +5,9 @@ import pytest
 import sys
 from unittest.mock import patch
 
-from bridge import get_source
-from sources.tibber import TibberSource
-from sources.p1_serial import P1SerialSource
+from lametric_power_bridge.main import get_source
+from lametric_power_bridge.sources.tibber import TibberSource
+from lametric_power_bridge.sources.p1_serial import P1SerialSource
 
 
 class TestGetSource:

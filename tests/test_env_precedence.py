@@ -16,14 +16,14 @@ def test_env_var_precedence_over_file(tmp_path):
     # Prepare environment for the subprocess
     env = os.environ.copy()
     env["TIBBER_TOKEN"] = "from_env_value"
-    env["PYTHONPATH"] = os.getcwd() # Ensure we can import bridge
+    env["PYTHONPATH"] = os.getcwd() # Ensure we can from lametric_power_bridge import main as bridge
     
     # Run a snippet that imports bridge and checks the token
     # We run inside tmp_path so bridge.py looks for .env there
     cmd = [
         sys.executable, 
         "-c", 
-        "from bridge import get_source; print(get_source('tibber').token)"
+        "from lametric_power_bridge.main import get_source; print(get_source('tibber').token)"
     ]
     
     result = subprocess.run(
@@ -55,7 +55,7 @@ def test_missing_env_file_works(tmp_path):
     cmd = [
         sys.executable, 
         "-c", 
-        "from bridge import get_source; print(get_source('tibber').token)"
+        "from lametric_power_bridge.main import get_source; print(get_source('tibber').token)"
     ]
     
     result = subprocess.run(

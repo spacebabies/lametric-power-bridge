@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-from sources.discovery_mdns import discover_homewizard_p1, HomeWizardListener, TARGET_PRODUCT_TYPE
+from lametric_power_bridge.sources.discovery_mdns import discover_homewizard_p1, HomeWizardListener, TARGET_PRODUCT_TYPE
 
 @pytest.mark.asyncio
 class TestHomeWizardListener:
@@ -63,8 +63,8 @@ class TestHomeWizardListener:
 class TestDiscoverHomeWizardP1:
     """Test the main discovery function"""
 
-    @patch("sources.discovery_mdns.AsyncZeroconf")
-    @patch("sources.discovery_mdns.AsyncServiceBrowser")
+    @patch("lametric_power_bridge.sources.discovery_mdns.AsyncZeroconf")
+    @patch("lametric_power_bridge.sources.discovery_mdns.AsyncServiceBrowser")
     async def test_discovery_success(self, mock_browser, mock_aiozc_cls):
         """Test successful discovery"""
         # Mock AsyncZeroconf instance
@@ -72,7 +72,7 @@ class TestDiscoverHomeWizardP1:
         mock_aiozc_cls.return_value = aiozc_instance
         
         # Mock listener to simulate finding device
-        with patch("sources.discovery_mdns.HomeWizardListener") as MockListener:
+        with patch("lametric_power_bridge.sources.discovery_mdns.HomeWizardListener") as MockListener:
             # We want the real listener logic or a mock that sets the event?
             # If we mock the listener, we need to control the event.
             
@@ -103,14 +103,14 @@ class TestDiscoverHomeWizardP1:
             mock_aiozc_cls.assert_called_once()
             aiozc_instance.async_close.assert_called_once()
 
-    @patch("sources.discovery_mdns.AsyncZeroconf")
-    @patch("sources.discovery_mdns.AsyncServiceBrowser")
+    @patch("lametric_power_bridge.sources.discovery_mdns.AsyncZeroconf")
+    @patch("lametric_power_bridge.sources.discovery_mdns.AsyncServiceBrowser")
     async def test_discovery_timeout(self, mock_browser, mock_aiozc_cls):
         """Test discovery timeout (no device found)"""
         aiozc_instance = AsyncMock()
         mock_aiozc_cls.return_value = aiozc_instance
         
-        with patch("sources.discovery_mdns.HomeWizardListener") as MockListener:
+        with patch("lametric_power_bridge.sources.discovery_mdns.HomeWizardListener") as MockListener:
             # Mock listener that never sets event
             listener_instance = MagicMock()
             listener_instance.found_ip = None

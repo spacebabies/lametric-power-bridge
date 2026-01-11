@@ -128,17 +128,21 @@ class YourSource:
 
 ```
 lametric-power-bridge/
-├── bridge.py                    # Orchestrator (43 lines)
-├── sources/                     # Ingress modules
+├── pyproject.toml               # Build configuration
+├── lametric_power_bridge/       # Main package
 │   ├── __init__.py
-│   ├── base.py                 # PowerReading + PowerSource Protocol
-│   ├── tibber.py               # Tibber WebSocket implementation
-│   ├── homewizard_v1.py        # HomeWizard P1 Meter (v1 HTTP API)
-│   ├── homewizard_v2.py        # HomeWizard P1 Meter (v2 WebSocket)
-│   └── p1_serial.py            # DSMR P1 Serial
-├── sinks/
-│   ├── __init__.py
-│   └── lametric.py             # LaMetric formatting + HTTP push
+│   ├── __main__.py             # Makes package runnable (python -m)
+│   ├── main.py                 # Orchestrator
+│   ├── sources/                 # Ingress modules
+│   │   ├── __init__.py
+│   │   ├── base.py             # PowerReading + PowerSource Protocol
+│   │   ├── tibber.py           # Tibber WebSocket implementation
+│   │   ├── homewizard_v1.py    # HomeWizard P1 Meter (v1 HTTP API)
+│   │   ├── homewizard_v2.py    # HomeWizard P1 Meter (v2 WebSocket)
+│   │   └── p1_serial.py        # DSMR P1 Serial
+│   └── sinks/
+│       ├── __init__.py
+│       └── lametric.py         # LaMetric formatting + HTTP push
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py             # pytest fixtures
@@ -148,10 +152,6 @@ lametric-power-bridge/
 │   ├── test_homewizard_v2.py   # HomeWizard v2 tests (8 tests)
 │   ├── test_p1_serial.py       # P1 Serial tests (11 tests)
 │   └── test_bridge.py          # Bridge logic tests (5 tests)
-├── lametric-power-bridge.env    # Configuration (all sources)
-├── requirements.txt
-├── requirements-dev.txt
-└── README.md
 ```
 
 ---
