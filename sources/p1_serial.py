@@ -206,11 +206,9 @@ class P1SerialSource:
 
                 if not line:
                     continue
-                
-                line_stripped = line.strip()
 
                 # Start of telegram
-                if line_stripped.startswith('/'):
+                if line.startswith('/'):
                     in_telegram = True
                     telegram = [line]
                     continue
@@ -219,7 +217,7 @@ class P1SerialSource:
                     telegram.append(line)
 
                     # End of telegram (CRC line)
-                    if line_stripped.startswith('!'):
+                    if line.startswith('!'):
                         # Validate CRC
                         if self._validate_crc(telegram):
                             return telegram
@@ -241,7 +239,7 @@ class P1SerialSource:
         """
         if not telegram:
             return False
-            
+
         last_line = telegram[-1].strip()
         if not last_line.startswith('!'):
             return False
