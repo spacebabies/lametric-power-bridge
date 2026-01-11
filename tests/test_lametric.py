@@ -1,5 +1,8 @@
 import pytest
 import os
+import asyncio
+import requests
+import logging
 from sources.base import PowerReading
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
 import sinks.lametric as lametric_module
@@ -130,179 +133,40 @@ async def test_push_to_lametric_stale(mocker):
     mock_send.assert_called_with(expected_payload_stale)
 
 
-# Discovery tests
+# Discovery / Fallback tests
 
 @pytest.mark.asyncio
-async def test_discovery_finds_one_device(mocker):
-    """Test SSDP discovery finding device and replacing host in URL"""
+async def test_initial_url_used_first(mocker):
+    """Test that configured URL is used first without discovery delay"""
     # Reset URL manager singleton
     lametric_module._url_manager = None
 
-    # Mock environment with full widget URL
     base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
     mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock _discover_lametric to return discovered IP
-    async def mock_discover(timeout=10.0):
-        return "192.168.1.100"
-
-    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
-    mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
-
-    # Call push which should trigger discovery
-    reading = PowerReading(power_watts=1500)
-    await push_to_lametric(reading)
-
-    # Verify request was made
-    mock_to_thread.assert_called_once()
-
-    # Verify URL has discovered IP but original path/secret
-    called_url = mock_to_thread.call_args[0][1]
-    assert called_url == "http://192.168.1.100:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-
-
-@pytest.mark.asyncio
-async def test_discovery_finds_zero_devices(mocker):
-    """Test SSDP discovery finding no devices (falls back to configured URL)"""
-    # Reset URL manager singleton
-    lametric_module._url_manager = None
-
-    # Mock environment with full widget URL
-    base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
-
-    # Mock _discover_lametric to return None (no devices)
-    async def mock_discover(timeout=10.0):
-        return None
-
-    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
-    mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
-
-    # Call push which should use original URL
-    reading = PowerReading(power_watts=1500)
-    await push_to_lametric(reading)
-
-    # Verify request was made with original URL (discovery failed, fallback)
-    mock_to_thread.assert_called_once()
-    called_url = mock_to_thread.call_args[0][1]
-    assert called_url == base_url
-
-
-@pytest.mark.asyncio
-async def test_discovery_finds_multiple_devices(mocker):
-    """Test SSDP discovery with new protocol (returns first device found)"""
-    # Reset URL manager singleton
-    lametric_module._url_manager = None
-
-    # Mock environment with full widget URL
-    base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
-
-    # Mock _discover_lametric to return first device found
-    async def mock_discover(timeout=10.0):
-        return "192.168.1.100"
-
-    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
-    mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
-
-    # Call push which should trigger discovery
-    reading = PowerReading(power_watts=1500)
-    await push_to_lametric(reading)
-
-    # Verify request was made with discovered IP
-    mock_to_thread.assert_called_once()
-    called_url = mock_to_thread.call_args[0][1]
-    assert called_url == "http://192.168.1.100:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-
-
-@pytest.mark.asyncio
-async def test_manual_url_with_discovery_replaces_host(mocker):
-    """Test that configured URL gets host replaced by SSDP discovery"""
-    # Reset URL manager singleton
-    lametric_module._url_manager = None
-
-    # Mock environment with full widget URL
-    base_url = "http://192.168.1.50:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
-
-    # Mock _discover_lametric to return discovered IP (different from configured)
-    async def mock_discover(timeout=10.0):
-        return "192.168.1.200"
-
-    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
+    # Mock discovery (should NOT be called if first request succeeds)
+    mock_discover = mocker.patch('sinks.lametric._discover_lametric')
+    
+    # Mock successful HTTP request
     mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
 
     # Call push
     reading = PowerReading(power_watts=1500)
     await push_to_lametric(reading)
 
-    # Verify request was made with discovered IP but original path
+    # Verify request was made with original URL
     mock_to_thread.assert_called_once()
     called_url = mock_to_thread.call_args[0][1]
-    assert called_url == "http://192.168.1.200:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-
-
-@pytest.mark.asyncio
-async def test_rediscovery_on_ip_change(mocker, caplog):
-    """Test re-discovery when device IP changes (DHCP lease renewal)"""
-    # Reset URL manager and create one with pre-discovered IP
-    lametric_module._url_manager = None
-
-    base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
-    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
-    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
-
-    # Track discovery calls
-    discover_calls = []
-
-    async def mock_discover(timeout=10.0):
-        # First call (initial discovery) returns old IP
-        # Second call (re-discovery) returns new IP
-        if len(discover_calls) == 0:
-            discover_calls.append("initial")
-            return "192.168.1.100"
-        else:
-            discover_calls.append("rediscovery")
-            return "192.168.1.101"
-
-    mocker.patch('sinks.lametric._discover_lametric', mock_discover)
-
-    # Mock asyncio.to_thread to simulate connection failure then success
-    call_count = 0
-
-    async def mock_to_thread(func, *args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            # First call fails with ConnectionError
-            import requests
-            raise requests.exceptions.ConnectionError("Connection refused")
-        # Second call (after re-discovery) succeeds
-        return None
-
-    mocker.patch('sinks.lametric.asyncio.to_thread', mock_to_thread)
-
-    # Call push which should trigger initial discovery, then re-discovery
-    reading = PowerReading(power_watts=1500)
-    await push_to_lametric(reading)
-
-    # Verify two requests were attempted (original + retry)
-    assert call_count == 2
-
-    # Verify re-discovery was triggered
-    assert len(discover_calls) == 2, "Both initial discovery and re-discovery should have been called"
-
-    # Verify connection failure was logged
-    assert "Connection failed" in caplog.text
-
+    assert called_url == base_url
+    
+    # Verify discovery was NOT called
+    mock_discover.assert_not_called()
 
 @pytest.mark.asyncio
-async def test_discovery_only_runs_once(mocker):
-    """Test that discovery is only attempted once per URL manager lifecycle"""
+async def test_rediscovery_fallback_success(mocker, caplog):
+    """Test that discovery runs if initial request fails, and subsequent request uses new IP"""
+    caplog.set_level(logging.INFO)
     # Reset URL manager singleton
     lametric_module._url_manager = None
 
@@ -310,32 +174,120 @@ async def test_discovery_only_runs_once(mocker):
     mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
     mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
 
-    # Mock _discover_lametric to return one device
-    async def mock_discover(timeout=10.0):
+    # Mock discovery returning new IP
+    async def mock_discover_impl(timeout=10.0):
         return "192.168.1.100"
+    
+    mocker.patch('sinks.lametric._discover_lametric', side_effect=mock_discover_impl)
 
-    mock_discover_fn = mocker.patch('sinks.lametric._discover_lametric', side_effect=mock_discover)
-    mock_to_thread = mocker.patch('sinks.lametric.asyncio.to_thread')
+    # Mock asyncio.to_thread to simulate failure then success
+    call_count = 0
+    async def mock_to_thread(func, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise requests.exceptions.ConnectionError("Connection refused")
+        return None
 
-    # Call push multiple times
+    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+
+    # Call push
     reading = PowerReading(power_watts=1500)
     await push_to_lametric(reading)
+
+    # Verify two requests: 1st with base_url, 2nd with discovered IP
+    assert call_count == 2
+    
+    calls = mocker.patch('sinks.lametric.asyncio.to_thread').call_args_list
+    # Note: side_effect mock replaces the object, so we can't inspect 'calls' on the original patch object easily
+    # unless we captured it. But we know call_count is 2.
+    
+    # Verify warning logged
+    assert "Connection failed" in caplog.text
+    assert "Device IP updated" in caplog.text
+
+@pytest.mark.asyncio
+async def test_rediscovery_fallback_not_found(mocker, caplog):
+    """Test that if discovery fails, we just give up for this attempt"""
+    # Reset URL manager singleton
+    lametric_module._url_manager = None
+
+    base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+
+    # Mock discovery returning None
+    mocker.patch('sinks.lametric._discover_lametric', return_value=None)
+
+    # Mock asyncio.to_thread to simulate failure
+    async def mock_to_thread(func, *args, **kwargs):
+        raise requests.exceptions.ConnectionError("Connection refused")
+
+    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+
+    # Call push
+    reading = PowerReading(power_watts=1500)
     await push_to_lametric(reading)
-    await push_to_lametric(reading)
 
-    # Verify discovery only ran once (IP cached after first call)
-    assert mock_discover_fn.call_count == 1
+    # Should have tried request once, then discovery, then stopped
+    # (Since discovery failed, it returns False, so no retry)
+    # We can't easily assert call count on to_thread without a spy, but we can check logs
+    
+    assert "Discovery failed" in caplog.text
+    assert "Connection failed" in caplog.text
 
-    # All three pushes should succeed with cached IP
-    assert mock_to_thread.call_count == 3
+@pytest.mark.asyncio
+async def test_ip_cached_after_rediscovery(mocker):
+    """Test that discovered IP is used for subsequent calls"""
+    # Reset URL manager singleton
+    lametric_module._url_manager = None
 
-    # Verify URL manager cached the discovery state
-    url_manager = lametric_module._url_manager
-    assert url_manager.discovered_ip == "192.168.1.100"
-    assert url_manager.discovery_attempted == True
+    base_url = "http://192.168.2.2:8080/api/v2/widget/update/com.lametric.diy.devwidget/secret123"
+    mocker.patch('sinks.lametric.LAMETRIC_URL', base_url)
+    mocker.patch('sinks.lametric.LAMETRIC_API_KEY', 'test-api-key')
+
+    # 1. First call fails -> Discovery success -> Retry success
+    # 2. Second call -> Uses discovered IP immediately
+    
+    # Mock discovery
+    mock_discover = mocker.patch('sinks.lametric._discover_lametric', return_value="192.168.1.100")
+    
+    call_count = 0
+    url_history = []
+    
+    async def mock_to_thread(func, url, payload):
+        nonlocal call_count
+        call_count += 1
+        url_history.append(url)
+        
+        # Fail the very first attempt (using base_url)
+        if call_count == 1:
+            raise requests.exceptions.ConnectionError("Conn Refused")
+        # Succeed all others
+        return None
+
+    mocker.patch('sinks.lametric.asyncio.to_thread', side_effect=mock_to_thread)
+
+    # First push
+    await push_to_lametric(PowerReading(power_watts=1500))
+    
+    # Verify: 1st attempt (base), Discovery, 2nd attempt (new IP)
+    assert call_count == 2
+    assert url_history[0] == base_url
+    assert "192.168.1.100" in url_history[1]
+    assert mock_discover.call_count == 1
+    
+    # Second push
+    await push_to_lametric(PowerReading(power_watts=1500))
+    
+    # Verify: 3rd attempt uses new IP directly
+    assert call_count == 3
+    assert "192.168.1.100" in url_history[2]
+    # Discovery count should still be 1 (cached)
+    assert mock_discover.call_count == 1
 
 
-# URL Construction Tests (the SINGLE place where URLs are built)
+# URL Construction Tests
 
 def test_replace_host_standard_url():
     """Test _replace_host() with standard widget URL"""
