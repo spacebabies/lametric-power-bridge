@@ -183,38 +183,19 @@ class LaMetricURLManager:
 
         self.base_url = base_url
         self.discovered_ip = None
-        self.discovery_attempted = False
 
     async def get_url(self) -> str:
         """
-        Get current LaMetric URL with SSDP-discovered IP if available.
-
-        On first call, attempts SSDP discovery. If successful, replaces
-        the host in base_url with discovered IP. Otherwise returns base_url as-is.
+        Get current LaMetric URL.
 
         Returns:
             LaMetric URL (either with discovered IP or original host)
         """
-        # Attempt SSDP discovery on first call
-        if not self.discovery_attempted:
-            await self._attempt_discovery()
-
         # Replace host with discovered IP if available
         if self.discovered_ip:
             return self._replace_host(self.base_url, self.discovered_ip)
 
         return self.base_url
-
-    async def _attempt_discovery(self):
-        """Try SSDP discovery once (called automatically on first get_url)"""
-        self.discovery_attempted = True
-        logger.info("LaMetric: Attempting SSDP discovery to handle DHCP changes...")
-        self.discovered_ip = await _discover_lametric(timeout=10.0)
-
-        if self.discovered_ip:
-            logger.info(f"LaMetric: SSDP discovered device at {self.discovered_ip}")
-        else:
-            logger.info("LaMetric: SSDP discovery failed, using configured URL as-is")
 
     async def rediscover(self) -> str | None:
         """
@@ -223,22 +204,18 @@ class LaMetricURLManager:
         Returns:
             New URL with updated IP if successful, None otherwise
         """
-        old_ip = self.discovered_ip
-        logger.info("LaMetric: Connection failed, attempting re-discovery...")
+        old_ip = self.discovered_ip or "configured host"
+        logger.info("LaMetric: Connection failed, attempting SSDP discovery...")
         self.discovered_ip = await _discover_lametric(timeout=10.0)
 
         if not self.discovered_ip:
-            logger.warning("LaMetric: Re-discovery failed")
+            logger.warning("LaMetric: Discovery failed")
             return None
 
         if self.discovered_ip != old_ip:
-            logger.info(f"LaMetric: Device IP changed: {old_ip} → {self.discovered_ip}")
+            logger.info(f"LaMetric: Device IP updated: {old_ip} -> {self.discovered_ip}")
 
         return self._replace_host(self.base_url, self.discovered_ip)
-
-    def can_rediscover(self) -> bool:
-        """Check if re-discovery is possible (i.e., we're using SSDP, not manual URL)"""
-        return self.discovered_ip is not None
 
     @staticmethod
     def _replace_host(url: str, new_ip: str) -> str:
@@ -314,11 +291,6 @@ async def _retry_with_rediscovery(url_manager: LaMetricURLManager, payload):
     Returns:
         True if retry succeeded, False otherwise
     """
-    # Only retry if we used SSDP discovery (not manual URL only)
-    if not url_manager.can_rediscover():
-        logger.debug("LaMetric: Cannot retry with re-discovery (using manual URL)")
-        return False
-
     # Attempt re-discovery and get new URL
     new_url = await url_manager.rediscover()
     if not new_url:
