@@ -201,14 +201,16 @@ class P1SerialSource:
         while True:
             try:
                 # Read one line (blocking call, run in executor)
-                line = await loop.run_in_executor(None, self.ser.readline)
-                line = line.decode('ascii', errors='ignore').strip()
+                line_bytes = await loop.run_in_executor(None, self.ser.readline)
+                line = line_bytes.decode('ascii', errors='ignore')
 
                 if not line:
                     continue
+                
+                line_stripped = line.strip()
 
                 # Start of telegram
-                if line.startswith('/'):
+                if line_stripped.startswith('/'):
                     in_telegram = True
                     telegram = [line]
                     continue
@@ -217,7 +219,7 @@ class P1SerialSource:
                     telegram.append(line)
 
                     # End of telegram (CRC line)
-                    if line.startswith('!'):
+                    if line_stripped.startswith('!'):
                         # Validate CRC
                         if self._validate_crc(telegram):
                             return telegram
@@ -237,19 +239,24 @@ class P1SerialSource:
         The last line should be '!xxxx' where xxxx is 4 hex digits.
         CRC is calculated over all bytes from '/' up to and including '!'.
         """
-        if not telegram or not telegram[-1].startswith('!'):
+        if not telegram:
+            return False
+            
+        last_line = telegram[-1].strip()
+        if not last_line.startswith('!'):
             return False
 
         try:
             # Extract CRC from telegram
-            crc_line = telegram[-1]
-            if len(crc_line) < 5:
+            if len(last_line) < 5:
                 return False
 
-            telegram_crc = int(crc_line[1:5], 16)
+            telegram_crc = int(last_line[1:5], 16)
 
             # Reconstruct telegram string for CRC calculation
-            telegram_str = '\r\n'.join(telegram[:-1]) + '\r\n!'
+            # We use the raw lines exactly as received
+            # All lines up to the last one, plus just the '!' from the last line
+            telegram_str = "".join(telegram[:-1]) + "!"
 
             # Calculate CRC16
             calculated_crc = self._calculate_crc16(telegram_str.encode('ascii'))
