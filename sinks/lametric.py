@@ -217,11 +217,6 @@ class LaMetricURLManager:
 
         return self._replace_host(self.base_url, self.discovered_ip)
 
-    def can_rediscover(self) -> bool:
-        """Check if re-discovery is possible."""
-        # Always allow discovery attempt if we have a base URL
-        return True
-
     @staticmethod
     def _replace_host(url: str, new_ip: str) -> str:
         """
@@ -296,11 +291,6 @@ async def _retry_with_rediscovery(url_manager: LaMetricURLManager, payload):
     Returns:
         True if retry succeeded, False otherwise
     """
-    # Only retry if we used SSDP discovery (not manual URL only)
-    if not url_manager.can_rediscover():
-        logger.debug("LaMetric: Cannot retry with re-discovery (using manual URL)")
-        return False
-
     # Attempt re-discovery and get new URL
     new_url = await url_manager.rediscover()
     if not new_url:
