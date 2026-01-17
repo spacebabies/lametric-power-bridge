@@ -18,7 +18,7 @@ I built this because routing your living room's energy data through a server in 
 
 ## Architecture
 
-The application utilizes a bespoke, highly sophisticated "pluggable architecture." In layman's terms, it is a Python script in three trench coats:
+The application utilizes a bespoke, highly sophisticated "pluggable architecture." In layman's terms, it is a Python package in three trench coats:
 
 1.  **Ingress (Source):** Reluctantly accepts data from a choice of providers (because variety is the spice of unnecessary complexity).
 2.  **Logic:** Performs complex mathematical wizardry (it checks if the number is negative).
@@ -55,7 +55,7 @@ cd lametric-power-bridge
 
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
 
 ### 2. Configuration
@@ -104,16 +104,16 @@ If you must.
 
 ```bash
 # Tibber (default)
-python bridge.py
+lametric-power-bridge
 
 # HomeWizard v1 API (HTTP polling)
-python bridge.py --source=homewizard-v1
+lametric-power-bridge --source=homewizard-v1
 
 # HomeWizard v2 API (WebSocket)
-python bridge.py --source=homewizard-v2
+lametric-power-bridge --source=homewizard-v2
 
 # P1 Serial (direct cable, no intermediaries)
-python bridge.py --source=p1-serial
+lametric-power-bridge --source=p1-serial
 ```
 
 The bridge defaults to Tibber for backwards compatibility. If you configured HomeWizard or P1 Serial, you must explicitly specify your chosen source. This is intentional. I am not your butler.

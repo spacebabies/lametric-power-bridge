@@ -9,8 +9,8 @@ try:
 except ImportError:
     httpx = None
 
-from sources.base import PowerReading
-from sources.discovery_mdns import discover_homewizard_p1
+from .base import PowerReading
+from .discovery_mdns import discover_homewizard_p1
 
 logger = logging.getLogger(__name__)
 

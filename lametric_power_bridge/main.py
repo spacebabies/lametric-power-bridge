@@ -12,11 +12,11 @@ __version__ = "1.0.0"
 # Load configuration from single .env file
 load_dotenv("lametric-power-bridge.env")
 
-from sources.tibber import TibberSource
-from sources.homewizard_v1 import HomeWizardV1Source
-from sources.homewizard_v2 import HomeWizardV2Source
-from sources.p1_serial import P1SerialSource
-from sinks.lametric import push_to_lametric, push_to_lametric_stale
+from .sources.tibber import TibberSource
+from .sources.homewizard_v1 import HomeWizardV1Source
+from .sources.homewizard_v2 import HomeWizardV2Source
+from .sources.p1_serial import P1SerialSource
+from .sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
 logging.basicConfig(
@@ -117,7 +117,7 @@ async def main(source_name: str):
             tg.create_task(stream_readings())
             tg.create_task(timeout_monitor())
 
-if __name__ == "__main__":
+def run():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="LaMetric Power Bridge")
     parser.add_argument(
@@ -138,3 +138,6 @@ if __name__ == "__main__":
         asyncio.run(main(args.source))
     except KeyboardInterrupt:
         logger.info("Script stopped by user.")
+
+if __name__ == "__main__":
+    run()

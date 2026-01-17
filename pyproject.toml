@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lametric-power-bridge"
+version = "1.0.0"
+description = "A mildly adequate solution for obsessively watching your money burn in real-time."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-only"
+authors = [
+    { name = "Joost", email = "joost@spacebabies.nl" },
+]
+keywords = ["lametric", "power", "energy", "monitoring", "tibber", "homewizard", "p1"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Home Automation",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+]
+dependencies = [
+    "requests>=2.32.0",
+    "websockets>=14.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+    "pyserial>=3.5",
+    "zeroconf>=0.131.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.3.0",
+    "pytest-mock>=3.0.0",
+    "pytest-socket>=0.7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/spacebabies/lametric-power-bridge"
+Issues = "https://github.com/spacebabies/lametric-power-bridge/issues"
+
+[project.scripts]
+lametric-power-bridge = "lametric_power_bridge.main:run"
+
+[tool.hatch.build.targets.sdist]
+include = ["/lametric_power_bridge"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["lametric_power_bridge"]

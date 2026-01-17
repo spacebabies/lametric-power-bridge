@@ -1,7 +1,7 @@
 import pytest
 import json
-from sources.homewizard_v2 import HomeWizardV2Source
-from sources.base import PowerReading
+from lametric_power_bridge.sources.homewizard_v2 import HomeWizardV2Source
+from lametric_power_bridge.sources.base import PowerReading
 
 
 @pytest.mark.asyncio
@@ -23,7 +23,7 @@ async def test_homewizard_v2_connect_no_host_triggers_discovery(mocker):
     """Test that connect triggers discovery when host is empty"""
     # Mock discovery
     mock_discover = mocker.patch(
-        'sources.homewizard_v2.discover_homewizard_p1',
+        'lametric_power_bridge.sources.homewizard_v2.discover_homewizard_p1',
         return_value="192.168.2.99"
     )
 
@@ -42,10 +42,10 @@ async def test_homewizard_v2_connect_no_host_triggers_discovery(mocker):
 async def test_homewizard_v2_connect_discovery_failure_exits(mocker):
     """Test that connect exits when discovery fails"""
     mocker.patch(
-        'sources.homewizard_v2.discover_homewizard_p1',
+        'lametric_power_bridge.sources.homewizard_v2.discover_homewizard_p1',
         return_value=None
     )
-    mock_exit = mocker.patch('sources.homewizard_v2.sys.exit')
+    mock_exit = mocker.patch('lametric_power_bridge.sources.homewizard_v2.sys.exit')
 
     source = HomeWizardV2Source(host=None, token="test-token")
     await source.connect()
@@ -56,7 +56,7 @@ async def test_homewizard_v2_connect_discovery_failure_exits(mocker):
 @pytest.mark.asyncio
 async def test_homewizard_v2_connect_no_token_exits(mocker):
     """Test that connect exits when HOMEWIZARD_TOKEN is empty"""
-    mock_exit = mocker.patch('sources.homewizard_v2.sys.exit')
+    mock_exit = mocker.patch('lametric_power_bridge.sources.homewizard_v2.sys.exit')
 
     source = HomeWizardV2Source(host="192.168.2.87", token="")
     await source.connect()
@@ -97,7 +97,7 @@ async def test_homewizard_v2_stream_yields_power_readings(mocker):
     async def mock_connect(*args, **kwargs):
         yield mock_websocket
 
-    mocker.patch('sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
 
     # Collect readings from stream
     readings = []
@@ -157,10 +157,10 @@ async def test_homewizard_v2_stream_handles_auth_failure(mocker):
     async def mock_connect(*args, **kwargs):
         yield mock_websocket
 
-    mocker.patch('sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
 
     # Mock sleep to avoid actual delays
-    mock_sleep = mocker.patch('sources.homewizard_v2.asyncio.sleep')
+    mock_sleep = mocker.patch('lametric_power_bridge.sources.homewizard_v2.asyncio.sleep')
 
     # Try to collect readings with a timeout (should fail auth and retry)
     readings = []
@@ -215,7 +215,7 @@ async def test_homewizard_v2_stream_missing_power_field(mocker):
     async def mock_connect(*args, **kwargs):
         yield mock_websocket
 
-    mocker.patch('sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
 
     # Collect readings
     readings = []
@@ -259,7 +259,7 @@ async def test_homewizard_v2_stream_ignores_unknown_message_types(mocker):
     async def mock_connect(*args, **kwargs):
         yield mock_websocket
 
-    mocker.patch('sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v2.websockets.connect', side_effect=mock_connect)
 
     # Collect readings
     readings = []

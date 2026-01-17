@@ -1,6 +1,6 @@
 import pytest
-from sources.homewizard_v1 import HomeWizardV1Source
-from sources.base import PowerReading
+from lametric_power_bridge.sources.homewizard_v1 import HomeWizardV1Source
+from lametric_power_bridge.sources.base import PowerReading
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ async def test_homewizard_connect_success(mocker):
     mock_client.get.return_value = mock_response
 
     # Patch AsyncClient to return our mock
-    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
 
     # Connect
     await source.connect()
@@ -37,7 +37,7 @@ async def test_homewizard_connect_no_host_triggers_discovery(mocker):
     """Test that connect triggers discovery when host is empty"""
     # Mock discovery
     mock_discover = mocker.patch(
-        'sources.homewizard_v1.discover_homewizard_p1',
+        'lametric_power_bridge.sources.homewizard_v1.discover_homewizard_p1',
         return_value="192.168.2.99"
     )
 
@@ -45,13 +45,13 @@ async def test_homewizard_connect_no_host_triggers_discovery(mocker):
     source = HomeWizardV1Source(host=None)
     
     # Mock client creation to avoid actual network calls
-    mocker.patch('sources.homewizard_v1.httpx.AsyncClient')
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.httpx.AsyncClient')
     mock_client = mocker.AsyncMock()
     mock_response = mocker.Mock()
     mock_response.json.return_value = {"active_power_w": 100}
     mock_response.raise_for_status = mocker.Mock()
     mock_client.get.return_value = mock_response
-    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
 
     await source.connect()
 
@@ -68,11 +68,11 @@ async def test_homewizard_connect_discovery_failure_exits(mocker):
     """Test that connect exits when discovery fails"""
     # Mock discovery failure (returns None)
     mocker.patch(
-        'sources.homewizard_v1.discover_homewizard_p1',
+        'lametric_power_bridge.sources.homewizard_v1.discover_homewizard_p1',
         return_value=None
     )
     
-    mock_exit = mocker.patch('sources.homewizard_v1.sys.exit')
+    mock_exit = mocker.patch('lametric_power_bridge.sources.homewizard_v1.sys.exit')
 
     source = HomeWizardV1Source(host=None)
     await source.connect()
@@ -97,8 +97,8 @@ async def test_homewizard_connect_network_error_exits(mocker):
     import httpx
     mock_client.get.side_effect = httpx.ConnectError("Cannot reach host")
 
-    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
-    mock_exit = mocker.patch('sources.homewizard_v1.sys.exit')
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+    mock_exit = mocker.patch('lametric_power_bridge.sources.homewizard_v1.sys.exit')
 
     await source.connect()
 
@@ -182,7 +182,7 @@ async def test_homewizard_stream_handles_device_busy(mocker):
     source.client = mock_client
 
     # Mock asyncio.sleep to avoid actual delays
-    mock_sleep = mocker.patch('sources.homewizard_v1.asyncio.sleep')
+    mock_sleep = mocker.patch('lametric_power_bridge.sources.homewizard_v1.asyncio.sleep')
 
     # Collect one reading
     readings = []
@@ -221,7 +221,7 @@ async def test_homewizard_stream_missing_active_power_field(mocker):
     source.client = mock_client
 
     # Mock sleep
-    mocker.patch('sources.homewizard_v1.asyncio.sleep')
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.asyncio.sleep')
 
     # Collect readings
     readings = []
@@ -245,7 +245,7 @@ async def test_homewizard_context_manager(mocker):
     mock_response.raise_for_status = mocker.Mock()
     mock_client.get.return_value = mock_response
 
-    mocker.patch('sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
+    mocker.patch('lametric_power_bridge.sources.homewizard_v1.httpx.AsyncClient', return_value=mock_client)
 
     # Use context manager pattern
     async with HomeWizardV1Source(host="192.168.2.87") as source:

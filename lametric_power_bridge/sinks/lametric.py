@@ -6,7 +6,7 @@ import requests
 import socket
 from urllib.parse import urlparse, urlunparse
 
-from sources.base import PowerReading
+from ..sources.base import PowerReading
 
 logger = logging.getLogger(__name__)
 
