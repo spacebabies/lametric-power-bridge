@@ -1,6 +1,7 @@
 """P1 Serial ingress module - reads DSMR telegrams via USB serial port"""
 import asyncio
 import logging
+from pathlib import Path
 import re
 import sys
 from typing import AsyncIterator, Optional
@@ -13,6 +14,10 @@ except ImportError:
 from sources.base import PowerReading
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_P1_SERIAL_DEVICE = (
+    "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AAAOFI2J-if00-port0"
+)
 
 
 class P1SerialSource:
@@ -32,7 +37,7 @@ class P1SerialSource:
 
     def __init__(
         self,
-        device: str = "/dev/ttyUSB0",
+        device: str = DEFAULT_P1_SERIAL_DEVICE,
         baudrate: int = 115200,
         timeout: float = 10.0,
         max_retries: int = 5
@@ -41,7 +46,7 @@ class P1SerialSource:
         Initialize P1 Serial source.
 
         Args:
-            device: Serial device path (default: /dev/ttyUSB0)
+            device: Stable serial device path under /dev/serial/by-id
             baudrate: Serial baudrate - 115200 for DSMR v4+, 9600 for v2/v3 (default: 115200)
             timeout: Read timeout in seconds (default: 10.0)
             max_retries: Maximum consecutive read failures before giving up (default: 5)
@@ -104,7 +109,7 @@ class P1SerialSource:
 
         except serial.SerialException as e:
             logger.error(f"P1 Serial: Cannot open {self.device}: {e}")
-            logger.error("Check that device exists and you have permissions (add user to 'dialout' group)")
+            self._log_device_help()
             sys.exit(1)
             return
         except Exception as e:
@@ -113,6 +118,29 @@ class P1SerialSource:
                 self.ser.close()
             sys.exit(1)
             return
+
+    @staticmethod
+    def _log_device_help() -> None:
+        """Log stable serial device paths to help diagnose configuration errors."""
+        by_id_directory = Path("/dev/serial/by-id")
+
+        try:
+            devices = sorted(str(path) for path in by_id_directory.iterdir())
+        except OSError:
+            devices = []
+
+        if devices:
+            logger.error("Available stable serial devices:")
+            for device in devices:
+                logger.error(f"  {device}")
+        else:
+            logger.error("No serial devices found under /dev/serial/by-id/")
+
+        logger.error(
+            "Find the correct device with 'ls -l /dev/serial/by-id/' and set "
+            "P1_SERIAL_DEVICE to its full path"
+        )
+        logger.error("Also check permissions (add the service user to the 'dialout' group)")
 
     async def stream(self) -> AsyncIterator[PowerReading]:
         """

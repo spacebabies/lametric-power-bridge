@@ -15,7 +15,7 @@ load_dotenv("lametric-power-bridge.env")
 from sources.tibber import TibberSource
 from sources.homewizard_v1 import HomeWizardV1Source
 from sources.homewizard_v2 import HomeWizardV2Source
-from sources.p1_serial import P1SerialSource
+from sources.p1_serial import DEFAULT_P1_SERIAL_DEVICE, P1SerialSource
 from sinks.lametric import push_to_lametric, push_to_lametric_stale
 
 # Setup logging
@@ -59,7 +59,7 @@ def get_source(source_name: str):
             
         return HomeWizardV2Source(host=host, token=token)
     elif source_name == "p1-serial":
-        device = os.getenv("P1_SERIAL_DEVICE", "/dev/ttyUSB0")
+        device = os.getenv("P1_SERIAL_DEVICE", DEFAULT_P1_SERIAL_DEVICE)
         baudrate = int(os.getenv("P1_SERIAL_BAUDRATE", "115200"))
         logger.info(f"Using source: P1 Serial (DSMR via {device} at {baudrate} baud)")
         return P1SerialSource(device=device, baudrate=baudrate)
