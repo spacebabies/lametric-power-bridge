@@ -34,7 +34,7 @@ The application utilizes a bespoke, highly sophisticated "pluggable architecture
 *   **One of the following data sources:**
     *   **Tibber Pulse** (Because if your data is going to be harvested by a third party, you should at least have the dignity to pay €50 for the privilege).
     *   **HomeWizard P1 Meter** (A tiny box that sits between your smart meter and your Wi-Fi router, politely asking for permission to read numbers once per second. Refreshingly local, which is the entire point).
-    *   **P1 Serial Cable** (A USB-to-RJ11 adapter that plugs directly into your smart meter's P1 port. No cloud, no Wi-Fi, just pure unfiltered DSMR telegrams over a serial connection. The most dignified option, assuming you can locate a free USB port on your server and possess the necessary permissions to access `/dev/ttyUSB0` without incident).
+    *   **P1 Serial Cable** (A USB-to-RJ11 adapter that plugs directly into your smart meter's P1 port. No cloud, no Wi-Fi, just pure unfiltered DSMR telegrams over a serial connection. The most dignified option, assuming you possess the necessary permissions to access its stable `/dev/serial/by-id/` path).
 
 ### 0. LaMetric Time Configuration
 
@@ -75,7 +75,7 @@ vim lametric-power-bridge.env  # Do not let me catch you using nano.
 - **Tibber:** Set `TIBBER_TOKEN` (from developer.tibber.com)
 - **HomeWizard v1:** `HOMEWIZARD_HOST` is optional (auto-discovery used if empty)
 - **HomeWizard v2:** Set `HOMEWIZARD_TOKEN` (required) and optionally `HOMEWIZARD_HOST`
-- **P1 Serial:** Optionally set `P1_SERIAL_DEVICE` (defaults to `/dev/ttyUSB0`) and `P1_SERIAL_BAUDRATE` (defaults to `115200` for DSMR v4+, use `9600` if your meter predates the invention of high-speed serial communication)
+- **P1 Serial:** Set `P1_SERIAL_DEVICE` to your cable's stable `/dev/serial/by-id/...` path (the bundled default matches an FTDI cable with serial `AAAOFI2J`) and optionally set `P1_SERIAL_BAUDRATE` (defaults to `115200` for DSMR v4+, use `9600` if your meter predates the invention of high-speed serial communication)
 
 **About auto-discovery:**
 The bridge supports auto-discovery for both LaMetric and HomeWizard devices:
@@ -181,11 +181,40 @@ The meter broadcasts DSMR telegrams every second over the P1 port. This implemen
 No HTTP requests. No GraphQL subscriptions. No WebSocket handshakes. Just bytes over a wire, as nature intended.
 
 **Debugging:**
-If the cable is not detected, verify it exists:
+Find the persistent ID assigned to your cable:
 ```bash
-ls -la /dev/ttyUSB*
+ls -l /dev/serial/by-id/
 ```
-If nothing appears, check that the cable is actually plugged in. It happens to the best of us.
+
+Use the complete path from the left-hand side, not the `/dev/ttyUSBx` target. For
+example, the bundled FTDI cable appears as:
+
+```text
+/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AAAOFI2J-if00-port0
+```
+
+Configure that path in `lametric-power-bridge.env`:
+
+```dotenv
+P1_SERIAL_DEVICE=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AAAOFI2J-if00-port0
+```
+
+Paths under `/dev/ttyUSBx` are assigned in device detection order and can change
+after rebooting or connecting another USB serial adapter. `/dev/serial/by-id/`
+follows the adapter's identity instead. If an adapter does not expose a unique
+serial number, use `ls -l /dev/serial/by-path/` and configure its physical USB-port
+path instead.
+
+For more detail about a detected adapter, run:
+
+```bash
+udevadm info --query=property \
+  --name=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AAAOFI2J-if00-port0
+```
+
+Look for `ID_SERIAL` and `DEVLINKS`; `DEVLINKS` contains the usable `by-id` and
+`by-path` names. If `/dev/serial/by-id/` is empty, check that the cable is actually
+plugged in. It happens to the best of us.
 
 ## Running as a Service (systemd)
 
